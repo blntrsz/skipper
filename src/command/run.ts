@@ -1,39 +1,43 @@
 import type { Command } from "commander";
+import {
+  assertNonEmpty,
+  listDirectory,
+  selectWithFzf,
+} from "../shared/command/interactive.js";
 
-export function registerRunCommand(program: Command) {
+/**
+ * Register run command.
+ *
+ * @since 1.0.0
+ * @category Worktree
+ */
+export function registerRunCommand(program: Command): void {
   program
     .command("run")
     .description("Pull changes and run opencode with a prompt")
     .argument("<prompt>", "The prompt to pass to opencode")
-    .action(async (prompt: string) => {
-      const baseDir = `${process.env.HOME}/.local/share/github`;
+    .action(runCommand);
+}
 
-      const repos = await Bun.$`ls -1 ${baseDir} 2>/dev/null || echo ""`.text();
-      const repoList = repos.split("\n").filter((r) => r.trim() !== "");
-
-      if (repoList.length === 0) {
-        console.error("No repositories found in ~/.local/share/github");
-        process.exit(1);
-      }
-
-      const selectedRepo =
-        await Bun.$`echo ${repoList.join("\n")} | fzf --prompt="Select repository: "`
-          .nothrow()
-          .text();
-      const repo = selectedRepo.trim();
-
-      if (!repo) {
-        console.log("No repository selected");
-        process.exit(0);
-      }
-
-      const repoPath = `${baseDir}/${repo}`;
-
-      console.log(`Selected: ${repo}`);
-      console.log("Pulling latest changes...");
-      await Bun.$`git -C ${repoPath} pull`.nothrow();
-
-      console.log("Running opencode...");
-      await Bun.$`opencode run ${prompt}`.cwd(repoPath);
-    });
+/**
+ * Execute run command flow.
+ *
+ * @since 1.0.0
+ * @category Worktree
+ */
+async function runCommand(prompt: string): Promise<void> {
+  const baseDir = `${process.env.HOME}/.local/share/github`;
+  const repoList = await listDirectory(baseDir);
+  assertNonEmpty(repoList, "No repositories found in ~/.local/share/github");
+  const repo = await selectWithFzf(repoList, "Select repository: ");
+  if (!repo) {
+    console.log("No repository selected");
+    process.exit(0);
+  }
+  const repoPath = `${baseDir}/${repo}`;
+  console.log(`Selected: ${repo}`);
+  console.log("Pulling latest changes...");
+  await Bun.$`git -C ${repoPath} pull`;
+  console.log("Running opencode...");
+  await Bun.$`opencode run ${prompt}`.cwd(repoPath);
 }
