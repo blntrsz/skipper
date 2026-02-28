@@ -8,9 +8,10 @@ import {
   BunTerminal,
 } from "@effect/platform-bun";
 import { createNew } from "./command/new";
+import { createRm } from "./command/rm";
 
 const command = Command.make("skipper").pipe(
-  Command.withSubcommands([createNew]),
+  Command.withSubcommands([createNew, createRm]),
 );
 
 // Set up the CLI application
