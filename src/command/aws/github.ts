@@ -1,0 +1,247 @@
+import { basename } from "node:path";
+
+type GithubHook = {
+  id?: number;
+  config?: {
+    url?: string;
+  };
+};
+
+export type UpsertGithubWebhookInput = {
+  repo: string;
+  webhookUrl: string;
+  events?: string[];
+  secret?: string;
+};
+
+export type UpsertGithubWebhookResult = {
+  action: "created" | "updated";
+  id: number;
+};
+
+export async function resolveGithubRepo(
+  explicitRepo?: string,
+  env: Record<string, string | undefined> = process.env,
+  cwd = process.cwd(),
+): Promise<string | undefined> {
+  if (explicitRepo) return normalizeRepo(explicitRepo);
+
+  const fromCurrentRepo = await resolveFromGitRemote(cwd);
+  if (fromCurrentRepo) return fromCurrentRepo;
+
+  const fromEnv = env.GITHUB_REPOSITORY ?? env.SKIPPER_GITHUB_REPO;
+  if (fromEnv) return normalizeRepo(fromEnv);
+
+  const inferredFromGh = await inferFromGhLoginAndCwd(cwd);
+  if (inferredFromGh) return inferredFromGh;
+
+  return undefined;
+}
+
+export async function upsertGithubWebhook(
+  input: UpsertGithubWebhookInput,
+): Promise<UpsertGithubWebhookResult> {
+  const repo = normalizeRepo(input.repo);
+  const webhookUrl = normalizeUrl(input.webhookUrl);
+  const events = input.events && input.events.length > 0 ? input.events : ["*"];
+
+  const hooksJson = await runGhApi([`repos/${repo}/hooks`]);
+  const hooks = parseHooks(hooksJson);
+  const existing = hooks.find(
+    (hook) => normalizeUrl(hook.config?.url) === webhookUrl,
+  );
+
+  if (existing?.id) {
+    const updatedJson = await runGhApi([
+      "--method",
+      "PATCH",
+      `repos/${repo}/hooks/${existing.id}`,
+      ...buildWebhookFormArgs({ webhookUrl, events, secret: input.secret }),
+    ]);
+    const updated = parseHook(updatedJson);
+    return {
+      action: "updated",
+      id: updated.id!,
+    };
+  }
+
+  const createdJson = await runGhApi([
+    "--method",
+    "POST",
+    `repos/${repo}/hooks`,
+    "-f",
+    "name=web",
+    ...buildWebhookFormArgs({ webhookUrl, events, secret: input.secret }),
+  ]);
+  const created = parseHook(createdJson);
+  return {
+    action: "created",
+    id: created.id!,
+  };
+}
+
+type WebhookFormArgsInput = {
+  webhookUrl: string;
+  events: string[];
+  secret?: string;
+};
+
+function buildWebhookFormArgs(input: WebhookFormArgsInput): string[] {
+  const args = [
+    "-F",
+    "active=true",
+    "-f",
+    `config[url]=${input.webhookUrl}`,
+    "-f",
+    "config[content_type]=json",
+    "-f",
+    "config[insecure_ssl]=0",
+  ];
+
+  for (const event of input.events) {
+    args.push("-f", `events[]=${event}`);
+  }
+
+  if (input.secret && input.secret.length > 0) {
+    args.push("-f", `config[secret]=${input.secret}`);
+  }
+
+  return args;
+}
+
+async function runGhApi(args: string[]): Promise<string> {
+  try {
+    const proc = Bun.spawn(["gh", "api", ...args], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    const [stdout, stderr, code] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ]);
+
+    if (code !== 0) {
+      throw new Error(stderr.trim() || `gh api failed (${code})`);
+    }
+    return stdout;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`GitHub API error: ${message}`);
+  }
+}
+
+function parseHooks(raw: string): GithubHook[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error("Invalid JSON from GitHub hooks list");
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error("Unexpected GitHub hooks response");
+  }
+  return parsed as GithubHook[];
+}
+
+function parseHook(raw: string): GithubHook {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new Error("Invalid JSON from GitHub webhook response");
+  }
+
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("Unexpected GitHub webhook response");
+  }
+
+  const hook = parsed as GithubHook;
+  if (typeof hook.id !== "number") {
+    throw new Error("GitHub webhook id missing");
+  }
+  return hook;
+}
+
+function normalizeRepo(value: string): string {
+  const trimmed = value.trim();
+  const fromRemote = parseGitHubRepoFromRemote(trimmed);
+  const repo = fromRemote ?? trimmed.replace(/^\/+/, "").replace(/\/+$/, "");
+  const clean = repo.replace(/\.git$/i, "");
+
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(clean)) {
+    throw new Error(`github repo must be owner/repo: ${value}`);
+  }
+
+  return clean;
+}
+
+function normalizeUrl(url?: string): string {
+  if (!url) return "";
+  return url.trim().replace(/\/+$/, "");
+}
+
+export function parseGitHubRepoFromRemote(url: string): string | undefined {
+  const trimmed = url.trim();
+  if (!trimmed) return undefined;
+
+  const ssh = trimmed.match(/^git@github\.com:([^/]+\/[^/]+?)(?:\.git)?\/?$/i);
+  if (ssh?.[1]) return ssh[1];
+
+  const https = trimmed.match(
+    /^https:\/\/github\.com\/([^/]+\/[^/]+?)(?:\.git)?\/?$/i,
+  );
+  if (https?.[1]) return https[1];
+
+  const sshUrl = trimmed.match(
+    /^ssh:\/\/git@github\.com\/([^/]+\/[^/]+?)(?:\.git)?\/?$/i,
+  );
+  if (sshUrl?.[1]) return sshUrl[1];
+
+  return undefined;
+}
+
+async function resolveFromGitRemote(cwd: string): Promise<string | undefined> {
+  const origin = await getGitRemoteUrl("origin", cwd);
+  const parsedOrigin = origin ? parseGitHubRepoFromRemote(origin) : undefined;
+  if (parsedOrigin) return normalizeRepo(parsedOrigin);
+
+  const remotesRaw = await Bun.$`git remote`.cwd(cwd).nothrow().text();
+  const remotes = remotesRaw
+    .split("\n")
+    .map((name) => name.trim())
+    .filter((name) => name.length > 0 && name !== "origin");
+
+  for (const remote of remotes) {
+    const url = await getGitRemoteUrl(remote, cwd);
+    if (!url) continue;
+    const parsed = parseGitHubRepoFromRemote(url);
+    if (parsed) return normalizeRepo(parsed);
+  }
+
+  return undefined;
+}
+
+async function getGitRemoteUrl(
+  remote: string,
+  cwd: string,
+): Promise<string | undefined> {
+  const url = await Bun.$`git remote get-url ${remote}`.cwd(cwd).nothrow().text();
+  const trimmed = url.trim();
+  if (!trimmed) return undefined;
+  return trimmed;
+}
+
+async function inferFromGhLoginAndCwd(
+  cwd: string,
+): Promise<string | undefined> {
+  const repoName = basename(cwd).trim();
+  if (!/^[A-Za-z0-9_.-]+$/.test(repoName)) return undefined;
+
+  const owner = await Bun.$`gh api user --jq .login`.cwd(cwd).nothrow().text();
+  const cleanOwner = owner.trim();
+  if (!/^[A-Za-z0-9_.-]+$/.test(cleanOwner)) return undefined;
+
+  return normalizeRepo(`${cleanOwner}/${repoName}`);
+}
