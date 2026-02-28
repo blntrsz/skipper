@@ -1,6 +1,14 @@
+import {
+  CloudFormationClient,
+  DescribeStacksCommand,
+} from "@aws-sdk/client-cloudformation";
 import { ECSClient, RunTaskCommand } from "@aws-sdk/client-ecs";
 import { Webhooks } from "@octokit/webhooks";
 import { parseJson } from "../../../shared/validation/parse-json.js";
+import { WORKERS_SHA256_PARAM } from "../../../worker/aws-params.js";
+import { routeWorkers } from "../../../worker/route.js";
+import { decodeWorkerManifest } from "../../../worker/serialize.js";
+import type { WorkerManifest } from "../../../worker/contract.js";
 import {
   type GitHubPayload,
   type QueueEnvelope,
@@ -21,9 +29,14 @@ const subnetIds = requiredEnv("ECS_SUBNET_IDS").split(",").map((v) => v.trim()).
 const webhookSecret = requiredEnv("WEBHOOK_SECRET");
 const assignPublicIp = process.env.ECS_ASSIGN_PUBLIC_IP === "DISABLED" ? "DISABLED" : "ENABLED";
 const containerName = process.env.ECS_CONTAINER_NAME ?? "webhook";
+const workersStackName = process.env.WORKERS_STACK_NAME?.trim() ?? "";
+const workersSha256 = process.env.WORKERS_SHA256?.trim() ?? "";
 
 const webhooks = new Webhooks({ secret: webhookSecret });
 const ecs = new ECSClient({ region: process.env.AWS_REGION });
+const cloudformation = new CloudFormationClient({ region: process.env.AWS_REGION });
+
+let cachedWorkers: { sha256: string; manifest: WorkerManifest | undefined } | undefined;
 
 /**
  * Process SQS webhook events and launch ECS tasks.
@@ -50,8 +63,17 @@ async function handleRecord(body: string): Promise<void> {
   const rawBody = decodeBase64(envelope.rawBodyB64 ?? "");
   await verifyWebhookBody(rawBody, webhookMeta.signature);
   const payload = parseJson(rawBody, isGitHubPayload, "github payload");
-  const environment = buildTaskEnvironment(payload, webhookMeta);
-  await runTask(environment);
+  const workers = await loadWorkersManifest();
+  const environments = buildTaskEnvironments(payload, webhookMeta, workers);
+  if (environments.length === 0) {
+    console.log(
+      `No worker matched event=${webhookMeta.githubEvent} action=${payload.action ?? "none"}`,
+    );
+    return;
+  }
+  for (const environment of environments) {
+    await runTask(environment);
+  }
 }
 
 /**
@@ -140,6 +162,53 @@ function resolvePrompt(payload: GitHubPayload): string | undefined {
 }
 
 /**
+ * Load and cache worker manifest from stack parameters.
+ *
+ * @since 1.0.0
+ * @category AWS.Lambda
+ */
+async function loadWorkersManifest(): Promise<WorkerManifest | undefined> {
+  if (!workersStackName || !workersSha256) {
+    return undefined;
+  }
+  if (cachedWorkers?.sha256 === workersSha256) {
+    return cachedWorkers.manifest;
+  }
+  const response = await cloudformation.send(
+    new DescribeStacksCommand({ StackName: workersStackName }),
+  );
+  const stack = response.Stacks?.[0];
+  if (!stack) {
+    throw new Error(`stack not found: ${workersStackName}`);
+  }
+  const parameterValues = readStackParameterValues(stack.Parameters ?? []);
+  const manifest = decodeWorkerManifest(parameterValues);
+  const parameterSha = parameterValues[WORKERS_SHA256_PARAM]?.trim() ?? "";
+  if (parameterSha !== workersSha256) {
+    throw new Error("worker manifest hash mismatch between lambda env and stack params");
+  }
+  cachedWorkers = { sha256: workersSha256, manifest };
+  return manifest;
+}
+
+/**
+ * Build stack parameter map from list.
+ *
+ * @since 1.0.0
+ * @category AWS.Lambda
+ */
+function readStackParameterValues(
+  parameters: Array<{ ParameterKey?: string; ParameterValue?: string }>,
+): Record<string, string | undefined> {
+  const values: Record<string, string | undefined> = {};
+  for (const parameter of parameters) {
+    if (!parameter.ParameterKey) continue;
+    values[parameter.ParameterKey] = parameter.ParameterValue;
+  }
+  return values;
+}
+
+/**
  * Parse legacy queue envelope format.
  *
  * @since 1.0.0
@@ -220,23 +289,79 @@ async function verifyWebhookBody(rawBody: string, signature: string): Promise<vo
  * @since 1.0.0
  * @category AWS.Lambda
  */
-function buildTaskEnvironment(
+function buildTaskEnvironments(
   payload: GitHubPayload,
   webhookMeta: WebhookMeta,
-): Array<{ name: string; value: string }> {
+  manifest: WorkerManifest | undefined,
+): Array<Array<{ name: string; value: string }>> {
   const repositoryUrl = resolveRepositoryUrl(payload);
-  const prompt = resolvePrompt(payload);
   if (!repositoryUrl) throw new Error("missing repository clone url");
-  if (!prompt) throw new Error("missing prompt");
-
-  const environment = [
+  const baseEnvironment = [
     { name: "GITHUB_EVENT", value: webhookMeta.githubEvent },
     { name: "GITHUB_DELIVERY", value: webhookMeta.deliveryId },
     { name: "GITHUB_REPO", value: payload.repository?.full_name ?? "unknown" },
     { name: "GITHUB_ACTION", value: payload.action ?? "none" },
     { name: "REPOSITORY_URL", value: repositoryUrl },
-    { name: "PROMPT", value: prompt },
   ];
+  if (!manifest) {
+    return [buildLegacyTaskEnvironment(payload, baseEnvironment)];
+  }
+  const matchedWorkers = routeWorkers(manifest, {
+    provider: "github",
+    event: webhookMeta.githubEvent,
+    action: payload.action,
+    repository: payload.repository?.full_name,
+    baseBranch: payload.pull_request?.base?.ref,
+    headBranch: payload.pull_request?.head?.ref,
+    draft: payload.pull_request?.draft,
+  });
+  return matchedWorkers.map((worker) => buildWorkerTaskEnvironment(baseEnvironment, worker));
+}
+
+/**
+ * Build legacy task environment when no workers configured.
+ *
+ * @since 1.0.0
+ * @category AWS.Lambda
+ */
+function buildLegacyTaskEnvironment(
+  payload: GitHubPayload,
+  baseEnvironment: Array<{ name: string; value: string }>,
+): Array<{ name: string; value: string }> {
+  const prompt = resolvePrompt(payload);
+  if (!prompt) throw new Error("missing prompt");
+  const environment = [...baseEnvironment, { name: "PROMPT", value: prompt }];
+  pushOptionalEnv(environment, "GITHUB_TOKEN", process.env.GITHUB_TOKEN);
+  pushOptionalEnv(environment, "ANTHROPIC_API_KEY", process.env.ANTHROPIC_API_KEY);
+  return environment;
+}
+
+/**
+ * Build worker-specific task environment.
+ *
+ * @since 1.0.0
+ * @category AWS.Lambda
+ */
+function buildWorkerTaskEnvironment(
+  baseEnvironment: Array<{ name: string; value: string }>,
+  worker: WorkerManifest["workers"][number],
+): Array<{ name: string; value: string }> {
+  const mode = worker.runtime.mode ?? "apply";
+  const allowPush = worker.runtime.allowPush ?? mode !== "comment-only";
+  const environment = [
+    ...baseEnvironment,
+    { name: "PROMPT", value: worker.runtime.prompt },
+    { name: "SKIPPER_WORKER_ID", value: worker.metadata.id },
+    { name: "SKIPPER_WORKER_TYPE", value: worker.metadata.type },
+    { name: "SKIPPER_WORKER_MODE", value: mode },
+    { name: "SKIPPER_ALLOW_PUSH", value: allowPush ? "1" : "0" },
+  ];
+  if (worker.runtime.agent) {
+    environment.push({ name: "ECS_AGENT", value: worker.runtime.agent });
+  }
+  for (const [key, value] of Object.entries(worker.runtime.env ?? {})) {
+    environment.push({ name: key, value });
+  }
   pushOptionalEnv(environment, "GITHUB_TOKEN", process.env.GITHUB_TOKEN);
   pushOptionalEnv(environment, "ANTHROPIC_API_KEY", process.env.ANTHROPIC_API_KEY);
   return environment;

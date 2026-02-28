@@ -21,6 +21,10 @@ describe("buildTemplate", () => {
     expect(template.Parameters.AgentType).toBeDefined();
     expect(template.Parameters.GitHubToken).toBeDefined();
     expect(template.Parameters.AnthropicApiKey).toBeDefined();
+    expect(template.Parameters.WorkersSha256).toBeDefined();
+    expect(template.Parameters.WorkersEncoding).toBeDefined();
+    expect(template.Parameters.WorkersChunkCount).toBeDefined();
+    expect(template.Parameters.WorkersChunk00).toBeDefined();
 
     const task = template.Resources.WebhookTaskDefinition;
     const container = task.Properties.ContainerDefinitions[0];
@@ -32,6 +36,9 @@ describe("buildTemplate", () => {
     expect(lambdaVars.PROMPT).toBeDefined();
     expect(lambdaVars.GITHUB_TOKEN).toBeDefined();
     expect(lambdaVars.ANTHROPIC_API_KEY).toBeDefined();
+    expect(lambdaVars.WORKERS_STACK_NAME).toBeDefined();
+    expect(lambdaVars.WORKERS_SHA256).toBeDefined();
+    expect(lambdaVars.WORKERS_CHUNK_COUNT).toBeDefined();
 
     expect(template.Outputs.ApiInvokeUrl).toBeDefined();
     expect(template.Outputs.EcsSecurityGroupId).toBeDefined();

@@ -12,6 +12,7 @@ import { randomBytes } from "node:crypto";
 import { basename } from "node:path";
 import type { Command } from "commander";
 import { parseUnknownJson } from "../../shared/validation/parse-json.js";
+import { createDefaultWorkerParameterValues } from "../../worker/aws-params.js";
 import { deployStack, getFailureSummary } from "./cloudformation.js";
 import {
   FORWARDER_LAMBDA_ZIP_SHA256,
@@ -339,7 +340,7 @@ async function resolveAccountId(region: string): Promise<string> {
  * @since 1.0.0
  * @category AWS.Deploy
  */
-function createTemplateParameters(
+export function createTemplateParameters(
   context: DeployContext,
   artifact: LambdaArtifactLocation,
 ): Record<string, string> {
@@ -358,6 +359,7 @@ function createTemplateParameters(
     Prompt: context.prompt,
     GitHubToken: context.githubToken,
     AnthropicApiKey: context.anthropicApiKey,
+    ...createDefaultWorkerParameterValues(),
   };
 }
 

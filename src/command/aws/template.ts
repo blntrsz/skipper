@@ -1,3 +1,11 @@
+import {
+  listWorkerChunkParameterKeys,
+  WORKERS_CHUNK_COUNT_PARAM,
+  WORKERS_ENCODING_PARAM,
+  WORKERS_SCHEMA_VERSION_PARAM,
+  WORKERS_SHA256_PARAM,
+} from "../../worker/aws-params.js";
+
 const SQS_MESSAGE_TEMPLATE = [
   '{"rawBodyB64":"$util.base64Encode($input.body)",',
   '"headers":{',
@@ -66,7 +74,27 @@ function buildParameters(): JsonMap {
     Prompt: { Type: "String", Default: "" },
     GitHubToken: { Type: "String", NoEcho: true, Default: "" },
     AnthropicApiKey: { Type: "String", NoEcho: true, Default: "" },
+    ...buildWorkerParameters(),
   };
+}
+
+/**
+ * Build worker manifest CloudFormation parameters.
+ *
+ * @since 1.0.0
+ * @category AWS.Template
+ */
+function buildWorkerParameters(): JsonMap {
+  const parameters: JsonMap = {
+    [WORKERS_ENCODING_PARAM]: { Type: "String", Default: "" },
+    [WORKERS_SHA256_PARAM]: { Type: "String", Default: "" },
+    [WORKERS_SCHEMA_VERSION_PARAM]: { Type: "String", Default: "1" },
+    [WORKERS_CHUNK_COUNT_PARAM]: { Type: "Number", Default: 0 },
+  };
+  for (const key of listWorkerChunkParameterKeys()) {
+    parameters[key] = { Type: "String", Default: "" };
+  }
+  return parameters;
 }
 
 /**
@@ -442,6 +470,11 @@ function buildLambdaResources(): JsonMap {
                     { "Fn::GetAtt": ["WebhookTaskRole", "Arn"] },
                   ],
                 },
+                {
+                  Effect: "Allow",
+                  Action: ["cloudformation:DescribeStacks"],
+                  Resource: "*",
+                },
               ],
             },
           },
@@ -469,6 +502,11 @@ function buildLambdaResources(): JsonMap {
             PROMPT: { Ref: "Prompt" },
             GITHUB_TOKEN: { Ref: "GitHubToken" },
             ANTHROPIC_API_KEY: { Ref: "AnthropicApiKey" },
+            WORKERS_STACK_NAME: { Ref: "AWS::StackName" },
+            WORKERS_ENCODING: { Ref: WORKERS_ENCODING_PARAM },
+            WORKERS_SHA256: { Ref: WORKERS_SHA256_PARAM },
+            WORKERS_SCHEMA_VERSION: { Ref: WORKERS_SCHEMA_VERSION_PARAM },
+            WORKERS_CHUNK_COUNT: { Ref: WORKERS_CHUNK_COUNT_PARAM },
           },
         },
         Code: {
