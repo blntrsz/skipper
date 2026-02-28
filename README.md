@@ -1,5 +1,7 @@
 # skipper
 
+TODO: add description
+
 To install dependencies:
 
 ```bash
