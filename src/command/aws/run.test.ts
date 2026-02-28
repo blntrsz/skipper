@@ -1,5 +1,7 @@
 import { expect, test } from "bun:test";
 import {
+  assertRunStackHasEcsOutputs,
+  buildDefaultRunStackName,
   buildRunTaskInput,
   describeTaskStopOutcome,
   parseSubnetIdsCsv,
@@ -28,6 +30,10 @@ test("readRequiredOutput reads output", () => {
 
 test("parseSubnetIdsCsv parses csv", () => {
   expect(parseSubnetIdsCsv("subnet-1, subnet-2")).toEqual(["subnet-1", "subnet-2"]);
+});
+
+test("buildDefaultRunStackName uses bootstrap suffix", () => {
+  expect(buildDefaultRunStackName("svc", "sandbox")).toBe("svc-sandbox-bootstrap");
 });
 
 test("buildRunTaskInput includes bedrock env", () => {
@@ -96,4 +102,10 @@ test("describeTaskStopOutcome marks unknown exit as failure", () => {
     success: false,
     message: "Task failed (arn:task/demo) exitCode=unknown",
   });
+});
+
+test("assertRunStackHasEcsOutputs fails on bootstrap-only outputs", () => {
+  expect(() =>
+    assertRunStackHasEcsOutputs([{ OutputKey: "EventBusArn", OutputValue: "arn:bus" } as any]),
+  ).toThrow("bootstrap stack missing ECS outputs");
 });

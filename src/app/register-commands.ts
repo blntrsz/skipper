@@ -4,7 +4,6 @@ import { registerAddCommand } from "../command/a.js";
 import { registerRemoveCommand } from "../command/rm.js";
 import { registerRunCommand } from "../command/run.js";
 import { registerAwsCommand } from "../command/aws/index.js";
-import { registerWorkersCommand } from "../command/workers/index.js";
 
 /**
  * Register all skipper commands.
@@ -19,7 +18,6 @@ export function registerCommands(program: Command): void {
   registerRemoveCommand(program);
   registerRunCommand(program);
   registerAwsCommand(program);
-  registerWorkersCommand(program);
 }
 
 /**

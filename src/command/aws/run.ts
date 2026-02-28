@@ -12,7 +12,7 @@ import {
 } from "@aws-sdk/client-ecs";
 import type { Command } from "commander";
 import { parseGitHubRepoFromRemote } from "./github.js";
-import { resolveDeployDefaults } from "./deploy.js";
+import { resolveDeployDefaults } from "./defaults.js";
 
 const DEFAULT_BEDROCK_MODEL = "eu.anthropic.claude-sonnet-4-6";
 
@@ -60,12 +60,15 @@ type StackRunResources = {
 export function registerAwsRunCommand(program: Command): void {
   program
     .command("run")
-    .description("Run prompt in ECS task")
+    .description("Run prompt in ECS task from bootstrap stack")
     .argument("<prompt...>", "Prompt text for selected agent")
     .option("--service <name>", "Service name (default: current directory)")
     .option("--env <name>", "Environment (default: AWS_PROFILE or sandbox)")
     .option("--profile <profile>", "AWS profile")
-    .option("--stack-name <name>", "CloudFormation stack name")
+    .option(
+      "--stack-name <name>",
+      "CloudFormation stack name (default: <service>-<env>-bootstrap)",
+    )
     .option(
       "--github-repo <owner/repo|url>",
       "GitHub repo to clone (default: current git repo)",
@@ -124,7 +127,7 @@ async function buildRunContext(
     service,
     env,
     region,
-    stackName: options.stackName ?? `${service}-${env}`,
+    stackName: options.stackName ?? buildDefaultRunStackName(service, env),
     repositoryUrl: toGitHubCloneUrl(repo),
     prompt,
     agent,
@@ -192,6 +195,7 @@ async function resolveRunResources(
   const stack = res.Stacks?.[0];
   if (!stack) throw new Error(`stack not found: ${stackName}`);
   const outputs = stack.Outputs ?? [];
+  assertRunStackHasEcsOutputs(outputs);
   const parameters = stack.Parameters ?? [];
   const securityGroupId =
     readOptionalOutput(outputs, "EcsSecurityGroupId") ??
@@ -205,6 +209,35 @@ async function resolveRunResources(
     securityGroupId,
     subnetIds: parseSubnetIdsCsv(subnetIdsCsv),
   };
+}
+
+/**
+ * Validate stack has ECS outputs for aws run.
+ *
+ * @since 1.0.0
+ * @category AWS.Run
+ */
+export function assertRunStackHasEcsOutputs(outputs: Output[]): void {
+  const missing = ["EcsClusterArn", "EcsTaskDefinitionArn"].filter(
+    (key) => readOptionalOutput(outputs, key) === undefined,
+  );
+  if (missing.length === 0) return;
+  if (readOptionalOutput(outputs, "EventBusArn")) {
+    throw new Error(
+      "bootstrap stack missing ECS outputs; re-run aws bootstrap to include ECS task resources",
+    );
+  }
+  throw new Error(`Missing CloudFormation output: ${missing[0]}`);
+}
+
+/**
+ * Build default stack name for aws run.
+ *
+ * @since 1.0.0
+ * @category AWS.Run
+ */
+export function buildDefaultRunStackName(service: string, env: string): string {
+  return `${service}-${env}-bootstrap`;
 }
 
 /**

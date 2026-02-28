@@ -58,11 +58,22 @@ export async function handler(event: SQSEvent): Promise<void> {
  */
 async function handleRecord(body: string): Promise<void> {
   const envelope = parseEnvelope(body);
+  const rawBody = decodeBase64(envelope.rawBodyB64 ?? "");
+  const payload = parseJson(rawBody, isGitHubPayload, "github payload");
   const headers = normalizeHeaders(envelope.headers);
   const webhookMeta = readWebhookMeta(headers);
-  const rawBody = decodeBase64(envelope.rawBodyB64 ?? "");
+  const eventFromPayload = inferEventFromPayload(payload);
+  if (!webhookMeta) {
+    const missingHeaders = listMissingWebhookHeaders(headers).join(",");
+    console.warn(
+      `Skipping webhook missing headers=${missingHeaders} event=${eventFromPayload} action=${payload.action ?? "none"} repo=${payload.repository?.full_name ?? "unknown"}`,
+    );
+    return;
+  }
+  console.log(
+    `Received webhook event=${webhookMeta.githubEvent} action=${payload.action ?? "none"} delivery=${webhookMeta.deliveryId} repo=${payload.repository?.full_name ?? "unknown"}`,
+  );
   await verifyWebhookBody(rawBody, webhookMeta.signature);
-  const payload = parseJson(rawBody, isGitHubPayload, "github payload");
   const workers = await loadWorkersManifest();
   const environments = buildTaskEnvironments(payload, webhookMeta, workers);
   if (environments.length === 0) {
@@ -257,18 +268,43 @@ type WebhookMeta = {
 };
 
 /**
+ * Infer GitHub event type from payload shape.
+ *
+ * @since 1.0.0
+ * @category AWS.Lambda
+ */
+function inferEventFromPayload(payload: GitHubPayload): string {
+  if (payload.pull_request) return "pull_request";
+  const record = payload as Record<string, unknown>;
+  if (typeof record.zen === "string") return "ping";
+  return "unknown";
+}
+
+/**
+ * List missing required webhook headers.
+ *
+ * @since 1.0.0
+ * @category AWS.Lambda
+ */
+function listMissingWebhookHeaders(headers: Record<string, string | undefined>): string[] {
+  const required = ["x-hub-signature-256", "x-github-event", "x-github-delivery"];
+  return required.filter((name) => !headers[name]);
+}
+
+/**
  * Read required webhook headers.
  *
  * @since 1.0.0
  * @category AWS.Lambda
  */
-function readWebhookMeta(headers: Record<string, string | undefined>): WebhookMeta {
+function readWebhookMeta(headers: Record<string, string | undefined>): WebhookMeta | undefined {
+  if (listMissingWebhookHeaders(headers).length > 0) {
+    return undefined;
+  }
   const signature = headers["x-hub-signature-256"];
   const githubEvent = headers["x-github-event"];
   const deliveryId = headers["x-github-delivery"];
-  if (!signature || !githubEvent || !deliveryId) {
-    throw new Error("missing GitHub webhook headers");
-  }
+  if (!signature || !githubEvent || !deliveryId) return undefined;
   return { signature, githubEvent, deliveryId };
 }
 

@@ -27,6 +27,25 @@ export type UpsertGithubWebhookResult = {
 };
 
 /**
+ * Convert repo into deterministic prefix-friendly slug.
+ *
+ * @since 1.0.0
+ * @category AWS.GitHub
+ */
+export function toRepositoryPrefix(repo: string): string {
+  const normalized = normalizeRepo(repo).toLowerCase();
+  const prefix = normalized
+    .replace(/[\/_.]+/g, "-")
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  if (!prefix) {
+    throw new Error(`invalid github repo: ${repo}`);
+  }
+  return prefix;
+}
+
+/**
  * Resolve target GitHub repo name.
  *
  * @since 1.0.0

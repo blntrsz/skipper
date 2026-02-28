@@ -1,79 +1,37 @@
 import { expect, test } from "bun:test";
-import {
-  createTemplateParameters,
-  parseGithubEvents,
-  parseTags,
-  resolveDeployDefaults,
-} from "./deploy.js";
+import { buildRepoScopedStackName } from "./deploy.js";
+import { buildDeployTemplate } from "./deploy-template.js";
 
-test("parseTags parses comma tags", () => {
-  expect(parseTags("team=infra,env=dev")).toEqual({ team: "infra", env: "dev" });
+test("buildRepoScopedStackName prefixes with repository slug", () => {
+  expect(buildRepoScopedStackName("acme-repo", "svc", "sandbox")).toBe(
+    "acme-repo-svc-sandbox-deploy",
+  );
 });
 
-test("parseTags handles empty", () => {
-  expect(parseTags(undefined)).toBeUndefined();
+test("buildRepoScopedStackName caps length at 128", () => {
+  const stackName = buildRepoScopedStackName(
+    "acme-repo-very-long-name-very-long-name-very-long-name-very-long-name-very-long-name",
+    "service-name-very-long",
+    "environment-name-very-long",
+  );
+  expect(stackName.length).toBeLessThanOrEqual(128);
+  expect(stackName).toContain("-");
 });
 
-test("resolveDeployDefaults uses env and cwd", () => {
-  const defaults = resolveDeployDefaults("/tmp/my_service", {
-    SKIPPER_AWS_ENV: "sandbox",
-    AWS_REGION: "eu-west-1",
-  });
-
-  expect(defaults.service).toBe("my-service");
-  expect(defaults.env).toBe("sandbox");
-  expect(defaults.region).toBe("eu-west-1");
-});
-
-test("resolveDeployDefaults falls back sanely", () => {
-  const defaults = resolveDeployDefaults("/", {});
-
-  expect(defaults.service).toBe("skipper");
-  expect(defaults.env).toBe("sandbox");
-  expect(defaults.region).toBe("us-east-1");
-});
-
-test("parseGithubEvents defaults to all", () => {
-  expect(parseGithubEvents(undefined)).toEqual(["*"]);
-  expect(parseGithubEvents(" ")).toEqual(["*"]);
-});
-
-test("parseGithubEvents parses csv", () => {
-  expect(parseGithubEvents("push,pull_request")).toEqual([
-    "push",
-    "pull_request",
-  ]);
-});
-
-test("createTemplateParameters includes worker defaults", () => {
-  const context: Parameters<typeof createTemplateParameters>[0] = {
-    service: "svc",
-    env: "sandbox",
-    region: "us-east-1",
-    stackName: "svc-sandbox",
-    queueName: "svc-sandbox-events",
-    apiName: "svc-sandbox-events-api",
-    stageName: "sandbox",
-    agent: "claude",
-    githubRepo: "acme/repo",
-    githubEvents: ["*"],
-    webhookSecret: "secret",
-    prompt: "prompt",
-    githubToken: "",
-    anthropicApiKey: "",
-    timeoutMinutes: 30,
-    tags: undefined,
-    skipGithubWebhook: false,
+test("buildDeployTemplate includes repository scoped event pattern", () => {
+  const template = JSON.parse(buildDeployTemplate()) as {
+    Resources: Record<string, any>;
+    Parameters: Record<string, any>;
   };
-  const artifact: Parameters<typeof createTemplateParameters>[1] = {
-    bucket: "bucket",
-    key: "key",
-    vpcId: "vpc-1",
-    subnetIds: ["subnet-1", "subnet-2"],
-  };
-  const parameters = createTemplateParameters(context, artifact);
-  expect(parameters.WorkersSha256).toBe("");
-  expect(parameters.WorkersEncoding).toBe("");
-  expect(parameters.WorkersChunkCount).toBe("0");
-  expect(parameters.WorkersChunk00).toBe("");
+
+  expect(template.Parameters.RepositoryFullName).toBeDefined();
+  expect(template.Parameters.RepositoryPrefix).toBeDefined();
+  const rule = template.Resources.RepositoryEventRule;
+  expect(rule).toBeDefined();
+  expect(rule.Type).toBe("AWS::Events::Rule");
+  expect(rule.Properties.EventPattern.detail.repository.full_name[0].Ref).toBe(
+    "RepositoryFullName",
+  );
+  expect(rule.Properties.EventPattern.source[0].Ref).toBe("EventSource");
+  expect(rule.Properties.EventPattern["detail-type"][0].Ref).toBe("EventDetailType");
 });

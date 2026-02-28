@@ -41,7 +41,7 @@ export async function loadWorkers(rootDir: string): Promise<WorkerDefinition[]> 
  */
 export async function discoverWorkerFiles(rootDir: string): Promise<string[]> {
   const files: string[] = [];
-  for await (const file of WORKER_GLOB.scan(rootDir)) {
+  for await (const file of WORKER_GLOB.scan({ cwd: rootDir, dot: true })) {
     files.push(file);
   }
   return files.sort((left, right) => left.localeCompare(right));

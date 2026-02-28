@@ -1,4 +1,5 @@
 import type { Command } from "commander";
+import { registerAwsBootstrapCommand } from "./bootstrap.js";
 import { registerAwsDeployCommand } from "./deploy.js";
 import { registerAwsRunCommand } from "./run.js";
 
@@ -10,6 +11,7 @@ import { registerAwsRunCommand } from "./run.js";
  */
 export function registerAwsCommand(program: Command) {
   const aws = program.command("aws").description("AWS commands");
+  registerAwsBootstrapCommand(aws);
   registerAwsDeployCommand(aws);
   registerAwsRunCommand(aws);
 }

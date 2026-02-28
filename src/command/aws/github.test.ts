@@ -1,5 +1,9 @@
 import { expect, test } from "bun:test";
-import { parseGitHubRepoFromRemote, resolveGithubRepo } from "./github.js";
+import {
+  parseGitHubRepoFromRemote,
+  resolveGithubRepo,
+  toRepositoryPrefix,
+} from "./github.js";
 
 test("parseGitHubRepoFromRemote supports ssh", () => {
   expect(parseGitHubRepoFromRemote("git@github.com:acme/api.git")).toBe(
@@ -25,4 +29,12 @@ test("resolveGithubRepo uses env", async () => {
     SKIPPER_GITHUB_REPO: "acme/from-env",
   }, "/");
   expect(repo).toBe("acme/from-env");
+});
+
+test("toRepositoryPrefix normalizes owner/repo", () => {
+  expect(toRepositoryPrefix("Acme/My.Repo")).toBe("acme-my-repo");
+});
+
+test("toRepositoryPrefix accepts github url", () => {
+  expect(toRepositoryPrefix("https://github.com/acme/repo.git")).toBe("acme-repo");
 });

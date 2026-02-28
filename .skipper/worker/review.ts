@@ -12,7 +12,7 @@ const reviewWorker = {
     {
       provider: "github",
       event: "pull_request",
-      actions: ["opened"],
+      actions: ["opened", "reopened", "ready_for_review", "synchronize"],
     },
   ],
   runtime: {

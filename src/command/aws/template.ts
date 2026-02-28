@@ -6,14 +6,7 @@ import {
   WORKERS_SHA256_PARAM,
 } from "../../worker/aws-params.js";
 
-const SQS_MESSAGE_TEMPLATE = [
-  '{"rawBodyB64":"$util.base64Encode($input.body)",',
-  '"headers":{',
-  '"x-hub-signature-256":"$util.escapeJavaScript($input.params().header.get(\'X-Hub-Signature-256\'))",',
-  '"x-github-event":"$util.escapeJavaScript($input.params().header.get(\'X-GitHub-Event\'))",',
-  '"x-github-delivery":"$util.escapeJavaScript($input.params().header.get(\'X-GitHub-Delivery\'))"',
-  "}}",
-].join("");
+type JsonMap = Record<string, unknown>;
 
 const WEBHOOK_TASK_COMMAND = [
   "set -euo pipefail",
@@ -29,7 +22,20 @@ const WEBHOOK_TASK_COMMAND = [
 
 const DEFAULT_BEDROCK_MODEL = "eu.anthropic.claude-sonnet-4-6";
 
-type JsonMap = Record<string, unknown>;
+const EVENTBRIDGE_REQUEST_TEMPLATE = [
+  '#set($context.requestOverride.header.X-Amz-Target = "AWSEvents.PutEvents")',
+  '#set($context.requestOverride.header.Content-Type = "application/x-amz-json-1.1")',
+  "{",
+  '  "Entries": [',
+  "    {",
+  '      "Source": "${EventSource}",',
+  '      "DetailType": "${EventDetailType}",',
+  '      "EventBusName": "${EventBusName}",',
+  '      "Detail": "{\\"rawBodyB64\\":\\"$util.base64Encode($input.body)\\",\\"headers\\":{\\"x-github-event\\":\\"$util.escapeJavaScript($input.params().header.get(\'X-GitHub-Event\'))\\",\\"x-github-delivery\\":\\"$util.escapeJavaScript($input.params().header.get(\'X-GitHub-Delivery\'))\\",\\"x-hub-signature-256\\":\\"$util.escapeJavaScript($input.params().header.get(\'X-Hub-Signature-256\'))\\"},\\"repository\\":{\\"full_name\\":\\"$util.escapeJavaScript($util.parseJson($input.body).repository.full_name)\\"},\\"requestId\\":\\"$context.requestId\\"}"',
+  "    }",
+  "  ]",
+  "}",
+].join("\n");
 
 /**
  * Build CloudFormation template JSON string.
@@ -40,7 +46,7 @@ type JsonMap = Record<string, unknown>;
 export function buildTemplate(): string {
   const template = {
     AWSTemplateFormatVersion: "2010-09-09",
-    Description: "Skipper API Gateway -> SQS -> Lambda -> ECS task",
+    Description: "Skipper API Gateway REST -> EventBridge",
     Parameters: buildParameters(),
     Resources: buildResources(),
     Outputs: buildOutputs(),
@@ -58,22 +64,14 @@ function buildParameters(): JsonMap {
   return {
     ServiceName: { Type: "String" },
     Environment: { Type: "String" },
-    QueueName: { Type: "String" },
     ApiName: { Type: "String" },
     StageName: { Type: "String" },
-    AgentType: {
-      Type: "String",
-      Default: "claude",
-      AllowedValues: ["claude", "opencode"],
-    },
     VpcId: { Type: "String" },
     SubnetIds: { Type: "CommaDelimitedList" },
-    LambdaCodeS3Bucket: { Type: "String" },
-    LambdaCodeS3Key: { Type: "String" },
+    EventBusName: { Type: "String" },
+    EventSource: { Type: "String" },
+    EventDetailType: { Type: "String" },
     WebhookSecret: { Type: "String", NoEcho: true },
-    Prompt: { Type: "String", Default: "" },
-    GitHubToken: { Type: "String", NoEcho: true, Default: "" },
-    AnthropicApiKey: { Type: "String", NoEcho: true, Default: "" },
     ...buildWorkerParameters(),
   };
 }
@@ -111,8 +109,12 @@ function buildOutputs(): JsonMap {
           "https://${ApiGatewayRestApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}/events",
       },
     },
-    QueueUrl: { Value: { Ref: "IngressQueue" } },
-    LambdaName: { Value: { Ref: "ForwarderLambdaFunction" } },
+    ApiId: { Value: { Ref: "ApiGatewayRestApi" } },
+    ApiStageName: { Value: { Ref: "StageName" } },
+    EventBusName: { Value: { Ref: "IngressEventBus" } },
+    EventBusArn: { Value: { "Fn::GetAtt": ["IngressEventBus", "Arn"] } },
+    EventSource: { Value: { Ref: "EventSource" } },
+    EventDetailType: { Value: { Ref: "EventDetailType" } },
     EcsClusterArn: { Value: { Ref: "WebhookEcsCluster" } },
     EcsTaskDefinitionArn: { Value: { Ref: "WebhookTaskDefinition" } },
     EcsSecurityGroupId: { Value: { Ref: "WebhookTaskSecurityGroup" } },
@@ -121,56 +123,20 @@ function buildOutputs(): JsonMap {
 }
 
 /**
- * Build resources by composing resource groups.
+ * Build all resources.
  *
  * @since 1.0.0
  * @category AWS.Template
  */
 function buildResources(): JsonMap {
   return {
-    ...buildIngressResources(),
-    ...buildApiResources(),
-    ...buildEcsResources(),
-    ...buildLambdaResources(),
-  };
-}
-
-/**
- * Build ingress queue resources.
- *
- * @since 1.0.0
- * @category AWS.Template
- */
-function buildIngressResources(): JsonMap {
-  return {
-    IngressQueueDlq: {
-      Type: "AWS::SQS::Queue",
+    IngressEventBus: {
+      Type: "AWS::Events::EventBus",
       Properties: {
-        QueueName: { "Fn::Sub": "${QueueName}-dlq" },
+        Name: { Ref: "EventBusName" },
       },
     },
-    IngressQueue: {
-      Type: "AWS::SQS::Queue",
-      Properties: {
-        QueueName: { Ref: "QueueName" },
-        RedrivePolicy: {
-          deadLetterTargetArn: { "Fn::GetAtt": ["IngressQueueDlq", "Arn"] },
-          maxReceiveCount: 5,
-        },
-      },
-    },
-  };
-}
-
-/**
- * Build API Gateway resources.
- *
- * @since 1.0.0
- * @category AWS.Template
- */
-function buildApiResources(): JsonMap {
-  return {
-    ApiGatewayToSqsRole: {
+    ApiGatewayToEventBridgeRole: {
       Type: "AWS::IAM::Role",
       Properties: {
         AssumeRolePolicyDocument: {
@@ -185,14 +151,14 @@ function buildApiResources(): JsonMap {
         },
         Policies: [
           {
-            PolicyName: "send-to-sqs",
+            PolicyName: "put-events",
             PolicyDocument: {
               Version: "2012-10-17",
               Statement: [
                 {
                   Effect: "Allow",
-                  Action: ["sqs:SendMessage"],
-                  Resource: { "Fn::GetAtt": ["IngressQueue", "Arn"] },
+                  Action: ["events:PutEvents"],
+                  Resource: { "Fn::GetAtt": ["IngressEventBus", "Arn"] },
                 },
               ],
             },
@@ -202,7 +168,10 @@ function buildApiResources(): JsonMap {
     },
     ApiGatewayRestApi: {
       Type: "AWS::ApiGateway::RestApi",
-      Properties: { Name: { Ref: "ApiName" } },
+      Properties: {
+        Name: { Ref: "ApiName" },
+        EndpointConfiguration: { Types: ["REGIONAL"] },
+      },
     },
     ApiGatewayResourceEvents: {
       Type: "AWS::ApiGateway::Resource",
@@ -219,22 +188,31 @@ function buildApiResources(): JsonMap {
         ResourceId: { Ref: "ApiGatewayResourceEvents" },
         HttpMethod: "POST",
         AuthorizationType: "NONE",
+        RequestParameters: {
+          "method.request.header.X-Amz-Target": false,
+          "method.request.header.Content-Type": false,
+        },
         Integration: {
           Type: "AWS",
           IntegrationHttpMethod: "POST",
-          Credentials: { "Fn::GetAtt": ["ApiGatewayToSqsRole", "Arn"] },
+          Credentials: { "Fn::GetAtt": ["ApiGatewayToEventBridgeRole", "Arn"] },
           Uri: {
             "Fn::Sub":
-              "arn:${AWS::Partition}:apigateway:${AWS::Region}:sqs:path/${AWS::AccountId}/${QueueName}",
+              "arn:${AWS::Partition}:apigateway:${AWS::Region}:events:action/PutEvents",
           },
-          RequestParameters: {
-            "integration.request.header.Content-Type":
-              "'application/x-www-form-urlencoded'",
-          },
+          PassthroughBehavior: "WHEN_NO_TEMPLATES",
           RequestTemplates: {
-            "application/json": `Action=SendMessage&MessageBody=$util.urlEncode(${SQS_MESSAGE_TEMPLATE})`,
+            "application/json": {
+              "Fn::Sub": [
+                EVENTBRIDGE_REQUEST_TEMPLATE,
+                {
+                  EventBusName: { Ref: "EventBusName" },
+                  EventSource: { Ref: "EventSource" },
+                  EventDetailType: { Ref: "EventDetailType" },
+                },
+              ],
+            },
           },
-          PassthroughBehavior: "NEVER",
           IntegrationResponses: [
             {
               StatusCode: "200",
@@ -258,11 +236,12 @@ function buildApiResources(): JsonMap {
         StageName: { Ref: "StageName" },
       },
     },
+    ...buildEcsResources(),
   };
 }
 
 /**
- * Build ECS resources.
+ * Build ECS resources for task execution runtime.
  *
  * @since 1.0.0
  * @category AWS.Template
@@ -338,10 +317,7 @@ function buildEcsResources(): JsonMap {
                 {
                   Sid: "AllowMarketplaceSubscription",
                   Effect: "Allow",
-                  Action: [
-                    "aws-marketplace:ViewSubscriptions",
-                    "aws-marketplace:Subscribe",
-                  ],
+                  Action: ["aws-marketplace:ViewSubscriptions", "aws-marketplace:Subscribe"],
                   Resource: "*",
                   Condition: {
                     StringEquals: {
@@ -385,7 +361,7 @@ function buildEcsResources(): JsonMap {
             Essential: true,
             Command: ["/bin/bash", "-lc", WEBHOOK_TASK_COMMAND],
             Environment: [
-              { Name: "ECS_AGENT", Value: { Ref: "AgentType" } },
+              { Name: "ECS_AGENT", Value: "claude" },
               { Name: "CLAUDE_CODE_USE_BEDROCK", Value: "1" },
               { Name: "AWS_REGION", Value: { Ref: "AWS::Region" } },
               { Name: "AWS_DEFAULT_REGION", Value: { Ref: "AWS::Region" } },
@@ -405,123 +381,6 @@ function buildEcsResources(): JsonMap {
             },
           },
         ],
-      },
-    },
-  };
-}
-
-/**
- * Build Lambda and event mapping resources.
- *
- * @since 1.0.0
- * @category AWS.Template
- */
-function buildLambdaResources(): JsonMap {
-  return {
-    ForwarderLambdaRole: {
-      Type: "AWS::IAM::Role",
-      Properties: {
-        AssumeRolePolicyDocument: {
-          Version: "2012-10-17",
-          Statement: [
-            {
-              Effect: "Allow",
-              Principal: { Service: "lambda.amazonaws.com" },
-              Action: "sts:AssumeRole",
-            },
-          ],
-        },
-        Policies: [
-          {
-            PolicyName: "lambda-basic",
-            PolicyDocument: {
-              Version: "2012-10-17",
-              Statement: [
-                {
-                  Effect: "Allow",
-                  Action: [
-                    "logs:CreateLogGroup",
-                    "logs:CreateLogStream",
-                    "logs:PutLogEvents",
-                  ],
-                  Resource: "*",
-                },
-                {
-                  Effect: "Allow",
-                  Action: [
-                    "sqs:ReceiveMessage",
-                    "sqs:DeleteMessage",
-                    "sqs:GetQueueAttributes",
-                    "sqs:GetQueueUrl",
-                    "sqs:ChangeMessageVisibility",
-                  ],
-                  Resource: { "Fn::GetAtt": ["IngressQueue", "Arn"] },
-                },
-                {
-                  Effect: "Allow",
-                  Action: ["ecs:RunTask"],
-                  Resource: { Ref: "WebhookTaskDefinition" },
-                },
-                {
-                  Effect: "Allow",
-                  Action: ["iam:PassRole"],
-                  Resource: [
-                    { "Fn::GetAtt": ["WebhookTaskExecutionRole", "Arn"] },
-                    { "Fn::GetAtt": ["WebhookTaskRole", "Arn"] },
-                  ],
-                },
-                {
-                  Effect: "Allow",
-                  Action: ["cloudformation:DescribeStacks"],
-                  Resource: "*",
-                },
-              ],
-            },
-          },
-        ],
-      },
-    },
-    ForwarderLambdaFunction: {
-      Type: "AWS::Lambda::Function",
-      Properties: {
-        FunctionName: { "Fn::Sub": "${ServiceName}-${Environment}-forwarder" },
-        Runtime: "nodejs20.x",
-        Handler: "index.handler",
-        Timeout: 30,
-        Role: { "Fn::GetAtt": ["ForwarderLambdaRole", "Arn"] },
-        Environment: {
-          Variables: {
-            WEBHOOK_SECRET: { Ref: "WebhookSecret" },
-            ECS_CLUSTER_ARN: { Ref: "WebhookEcsCluster" },
-            ECS_TASK_DEFINITION_ARN: { Ref: "WebhookTaskDefinition" },
-            ECS_SECURITY_GROUP_ID: { Ref: "WebhookTaskSecurityGroup" },
-            ECS_SUBNET_IDS: { "Fn::Join": [",", { Ref: "SubnetIds" }] },
-            ECS_ASSIGN_PUBLIC_IP: "ENABLED",
-            ECS_CONTAINER_NAME: "webhook",
-            ECS_AGENT: { Ref: "AgentType" },
-            PROMPT: { Ref: "Prompt" },
-            GITHUB_TOKEN: { Ref: "GitHubToken" },
-            ANTHROPIC_API_KEY: { Ref: "AnthropicApiKey" },
-            WORKERS_STACK_NAME: { Ref: "AWS::StackName" },
-            WORKERS_ENCODING: { Ref: WORKERS_ENCODING_PARAM },
-            WORKERS_SHA256: { Ref: WORKERS_SHA256_PARAM },
-            WORKERS_SCHEMA_VERSION: { Ref: WORKERS_SCHEMA_VERSION_PARAM },
-            WORKERS_CHUNK_COUNT: { Ref: WORKERS_CHUNK_COUNT_PARAM },
-          },
-        },
-        Code: {
-          S3Bucket: { Ref: "LambdaCodeS3Bucket" },
-          S3Key: { Ref: "LambdaCodeS3Key" },
-        },
-      },
-    },
-    QueueToLambdaEventSourceMapping: {
-      Type: "AWS::Lambda::EventSourceMapping",
-      Properties: {
-        EventSourceArn: { "Fn::GetAtt": ["IngressQueue", "Arn"] },
-        FunctionName: { Ref: "ForwarderLambdaFunction" },
-        Enabled: true,
-        BatchSize: 10,
       },
     },
   };
