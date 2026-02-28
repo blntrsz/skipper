@@ -1,4 +1,9 @@
 import { basename } from "node:path";
+import {
+  isRecord,
+  parseJson,
+  readOptionalString,
+} from "../../shared/validation/parse-json.js";
 
 type GithubHook = {
   id?: number;
@@ -6,6 +11,8 @@ type GithubHook = {
     url?: string;
   };
 };
+
+type GithubHookWithId = GithubHook & { id: number };
 
 export type UpsertGithubWebhookInput = {
   repo: string;
@@ -19,6 +26,12 @@ export type UpsertGithubWebhookResult = {
   id: number;
 };
 
+/**
+ * Resolve target GitHub repo name.
+ *
+ * @since 1.0.0
+ * @category AWS.GitHub
+ */
 export async function resolveGithubRepo(
   explicitRepo?: string,
   env: Record<string, string | undefined> = process.env,
@@ -38,6 +51,12 @@ export async function resolveGithubRepo(
   return undefined;
 }
 
+/**
+ * Create or update webhook for repository.
+ *
+ * @since 1.0.0
+ * @category AWS.GitHub
+ */
 export async function upsertGithubWebhook(
   input: UpsertGithubWebhookInput,
 ): Promise<UpsertGithubWebhookResult> {
@@ -51,7 +70,7 @@ export async function upsertGithubWebhook(
     (hook) => normalizeUrl(hook.config?.url) === webhookUrl,
   );
 
-  if (existing?.id) {
+  if (existing?.id !== undefined) {
     const updatedJson = await runGhApi([
       "--method",
       "PATCH",
@@ -61,7 +80,7 @@ export async function upsertGithubWebhook(
     const updated = parseHook(updatedJson);
     return {
       action: "updated",
-      id: updated.id!,
+      id: updated.id,
     };
   }
 
@@ -76,7 +95,7 @@ export async function upsertGithubWebhook(
   const created = parseHook(createdJson);
   return {
     action: "created",
-    id: created.id!,
+    id: created.id,
   };
 }
 
@@ -86,6 +105,12 @@ type WebhookFormArgsInput = {
   secret?: string;
 };
 
+/**
+ * Build `gh api` form args for webhook.
+ *
+ * @since 1.0.0
+ * @category AWS.GitHub
+ */
 function buildWebhookFormArgs(input: WebhookFormArgsInput): string[] {
   const args = [
     "-F",
@@ -109,6 +134,12 @@ function buildWebhookFormArgs(input: WebhookFormArgsInput): string[] {
   return args;
 }
 
+/**
+ * Execute `gh api` command.
+ *
+ * @since 1.0.0
+ * @category AWS.GitHub
+ */
 async function runGhApi(args: string[]): Promise<string> {
   try {
     const proc = Bun.spawn(["gh", "api", ...args], {
@@ -132,38 +163,69 @@ async function runGhApi(args: string[]): Promise<string> {
   }
 }
 
+/**
+ * Parse hooks list response.
+ *
+ * @since 1.0.0
+ * @category AWS.GitHub
+ */
 function parseHooks(raw: string): GithubHook[] {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new Error("Invalid JSON from GitHub hooks list");
-  }
-  if (!Array.isArray(parsed)) {
-    throw new Error("Unexpected GitHub hooks response");
-  }
-  return parsed as GithubHook[];
+  const parsed = parseJson(raw, isHookArray, "GitHub hooks list");
+  return parsed;
 }
 
-function parseHook(raw: string): GithubHook {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    throw new Error("Invalid JSON from GitHub webhook response");
+/**
+ * Check hooks array shape.
+ *
+ * @since 1.0.0
+ * @category AWS.GitHub
+ */
+function isHookArray(value: unknown): value is GithubHook[] {
+  if (!Array.isArray(value)) {
+    return false;
   }
+  return value.every(isGithubHook);
+}
 
-  if (!parsed || typeof parsed !== "object") {
-    throw new Error("Unexpected GitHub webhook response");
-  }
-
-  const hook = parsed as GithubHook;
-  if (typeof hook.id !== "number") {
+/**
+ * Parse webhook object response.
+ *
+ * @since 1.0.0
+ * @category AWS.GitHub
+ */
+function parseHook(raw: string): GithubHookWithId {
+  const hook = parseJson(raw, isGithubHook, "GitHub webhook response");
+  if (hook.id === undefined) {
     throw new Error("GitHub webhook id missing");
   }
-  return hook;
+  return {
+    ...hook,
+    id: hook.id,
+  };
 }
 
+/**
+ * Validate GitHub hook shape.
+ *
+ * @since 1.0.0
+ * @category AWS.GitHub
+ */
+function isGithubHook(value: unknown): value is GithubHook {
+  if (!isRecord(value)) return false;
+  if (value.id !== undefined && typeof value.id !== "number") return false;
+  const config = value.config;
+  if (config === undefined) return true;
+  if (!isRecord(config)) return false;
+  const url = readOptionalString(config, "url");
+  return config.url === undefined || typeof url === "string";
+}
+
+/**
+ * Normalize repo input to owner/repo.
+ *
+ * @since 1.0.0
+ * @category AWS.GitHub
+ */
 function normalizeRepo(value: string): string {
   const trimmed = value.trim();
   const fromRemote = parseGitHubRepoFromRemote(trimmed);
@@ -177,11 +239,23 @@ function normalizeRepo(value: string): string {
   return clean;
 }
 
+/**
+ * Normalize URL for matching.
+ *
+ * @since 1.0.0
+ * @category AWS.GitHub
+ */
 function normalizeUrl(url?: string): string {
   if (!url) return "";
   return url.trim().replace(/\/+$/, "");
 }
 
+/**
+ * Parse owner/repo from GitHub remote URL.
+ *
+ * @since 1.0.0
+ * @category AWS.GitHub
+ */
 export function parseGitHubRepoFromRemote(url: string): string | undefined {
   const trimmed = url.trim();
   if (!trimmed) return undefined;
@@ -202,6 +276,12 @@ export function parseGitHubRepoFromRemote(url: string): string | undefined {
   return undefined;
 }
 
+/**
+ * Resolve repo from local git remotes.
+ *
+ * @since 1.0.0
+ * @category AWS.GitHub
+ */
 async function resolveFromGitRemote(cwd: string): Promise<string | undefined> {
   const origin = await getGitRemoteUrl("origin", cwd);
   const parsedOrigin = origin ? parseGitHubRepoFromRemote(origin) : undefined;
@@ -223,6 +303,12 @@ async function resolveFromGitRemote(cwd: string): Promise<string | undefined> {
   return undefined;
 }
 
+/**
+ * Get git remote URL value.
+ *
+ * @since 1.0.0
+ * @category AWS.GitHub
+ */
 async function getGitRemoteUrl(
   remote: string,
   cwd: string,
@@ -233,6 +319,12 @@ async function getGitRemoteUrl(
   return trimmed;
 }
 
+/**
+ * Infer repo from `gh` login and cwd.
+ *
+ * @since 1.0.0
+ * @category AWS.GitHub
+ */
 async function inferFromGhLoginAndCwd(
   cwd: string,
 ): Promise<string | undefined> {

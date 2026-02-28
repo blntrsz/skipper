@@ -9,6 +9,12 @@ export type DefaultNetwork = {
   subnetIds: string[];
 };
 
+/**
+ * Discover default VPC and available subnets.
+ *
+ * @since 1.0.0
+ * @category AWS.Deploy
+ */
 export async function discoverDefaultNetwork(
   client: EC2Client,
 ): Promise<DefaultNetwork> {

@@ -9,6 +9,9 @@
   },
   "scripts": {
     "cli": "bun run ./src/index.ts",
+    "typecheck": "bun x tsc --noEmit",
+    "lint": "bun run typecheck && bun run ./scripts/check-source-standards.ts",
+    "test": "bun test",
     "build:lambda-artifact": "bun run ./scripts/generate-lambda-artifact.ts",
     "build": "bun run build:lambda-artifact && bun build ./src/index.ts --compile --outfile bin/skipper"
   },

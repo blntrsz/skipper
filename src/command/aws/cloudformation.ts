@@ -34,6 +34,12 @@ export type DeployStackResult = {
   outputs: Output[];
 };
 
+/**
+ * Classify CloudFormation stack status.
+ *
+ * @since 1.0.0
+ * @category AWS.CloudFormation
+ */
 export function classifyStackStatus(status: string):
   | "success"
   | "failure"
@@ -43,6 +49,12 @@ export function classifyStackStatus(status: string):
   return "in-progress";
 }
 
+/**
+ * Create or update stack and wait for terminal status.
+ *
+ * @since 1.0.0
+ * @category AWS.CloudFormation
+ */
 export async function deployStack(
   input: DeployStackInput,
 ): Promise<DeployStackResult> {
@@ -101,6 +113,12 @@ export async function deployStack(
   return { action: "update", status, outputs };
 }
 
+/**
+ * Build short failure summary from stack events.
+ *
+ * @since 1.0.0
+ * @category AWS.CloudFormation
+ */
 export async function getFailureSummary(
   client: CloudFormationClient,
   stackName: string,
@@ -125,6 +143,12 @@ export async function getFailureSummary(
   return events;
 }
 
+/**
+ * Check if stack already exists.
+ *
+ * @since 1.0.0
+ * @category AWS.CloudFormation
+ */
 async function stackExists(
   client: CloudFormationClient,
   stackName: string,
@@ -139,6 +163,12 @@ async function stackExists(
   }
 }
 
+/**
+ * Read stack status value.
+ *
+ * @since 1.0.0
+ * @category AWS.CloudFormation
+ */
 async function getStackStatus(
   client: CloudFormationClient,
   stackName: string,
@@ -149,6 +179,12 @@ async function getStackStatus(
   return stack.StackStatus;
 }
 
+/**
+ * Poll until stack reaches terminal status.
+ *
+ * @since 1.0.0
+ * @category AWS.CloudFormation
+ */
 async function waitForTerminalStatus(
   client: CloudFormationClient,
   stackName: string,
@@ -167,6 +203,12 @@ async function waitForTerminalStatus(
   throw new Error(`Timed out waiting for stack ${stackName}`);
 }
 
+/**
+ * Read stack outputs list.
+ *
+ * @since 1.0.0
+ * @category AWS.CloudFormation
+ */
 async function getOutputs(
   client: CloudFormationClient,
   stackName: string,
@@ -176,6 +218,12 @@ async function getOutputs(
   return stack?.Outputs ?? [];
 }
 
+/**
+ * Convert parameters map to CloudFormation list.
+ *
+ * @since 1.0.0
+ * @category AWS.CloudFormation
+ */
 function toCfnParameters(parameters: Record<string, string>) {
   return Object.entries(parameters).map(([ParameterKey, ParameterValue]) => ({
     ParameterKey,
@@ -183,6 +231,12 @@ function toCfnParameters(parameters: Record<string, string>) {
   }));
 }
 
+/**
+ * Convert tags map to CloudFormation list.
+ *
+ * @since 1.0.0
+ * @category AWS.CloudFormation
+ */
 function toCfnTags(tags?: Record<string, string>) {
   if (!tags) return undefined;
   return Object.entries(tags).map(([Key, Value]) => ({ Key, Value }));
