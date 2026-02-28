@@ -16,8 +16,10 @@ const WEBHOOK_TASK_COMMAND = [
   "id -u runner >/dev/null 2>&1 || useradd -m -s /bin/bash runner",
   'runuser -u runner -- bash -lc "curl -fsSL https://bun.sh/install | bash"',
   'runuser -u runner -- env PATH="/home/runner/.bun/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" bash -lc "bun add -g @anthropic-ai/claude-code opencode-ai"',
-  'runuser -u runner -- env REPO_URL="$REPO_URL" PROMPT="$PROMPT" GITHUB_TOKEN="${GITHUB_TOKEN:-}" ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}" PATH="/home/runner/.bun/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" bash -lc \"if [ -n \\\"${GITHUB_TOKEN:-}\\\" ] && [ \\\"${REPO_URL#https://github.com/}\\\" != \\\"$REPO_URL\\\" ]; then REPO_URL=\\\"https://x-access-token:${GITHUB_TOKEN:-}@${REPO_URL#https://}\\\"; fi; rm -rf /home/runner/repo; git clone --depth 1 \\\"$REPO_URL\\\" /home/runner/repo; cd /home/runner/repo; claude --dangerously-skip-permissions -p \\\"$PROMPT\\\"\"',
+  'runuser -u runner -- env REPO_URL="$REPO_URL" PROMPT="$PROMPT" ECS_AGENT="${ECS_AGENT:-claude}" GITHUB_TOKEN="${GITHUB_TOKEN:-}" ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}" PATH="/home/runner/.bun/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" bash -lc \"if [ -n \\\"${GITHUB_TOKEN:-}\\\" ] && [ \\\"${REPO_URL#https://github.com/}\\\" != \\\"$REPO_URL\\\" ]; then REPO_URL=\\\"https://x-access-token:${GITHUB_TOKEN:-}@${REPO_URL#https://}\\\"; fi; rm -rf /home/runner/repo; git clone --depth 1 \\\"$REPO_URL\\\" /home/runner/repo; cd /home/runner/repo; if [ \\\"${ECS_AGENT}\\\" = \\\"opencode\\\" ]; then opencode run \\\"$PROMPT\\\"; else claude --dangerously-skip-permissions -p \\\"$PROMPT\\\"; fi\"',
 ].join("; ");
+
+const DEFAULT_BEDROCK_MODEL = "eu.anthropic.claude-sonnet-4-6";
 
 type JsonMap = Record<string, unknown>;
 
@@ -51,6 +53,11 @@ function buildParameters(): JsonMap {
     QueueName: { Type: "String" },
     ApiName: { Type: "String" },
     StageName: { Type: "String" },
+    AgentType: {
+      Type: "String",
+      Default: "claude",
+      AllowedValues: ["claude", "opencode"],
+    },
     VpcId: { Type: "String" },
     SubnetIds: { Type: "CommaDelimitedList" },
     LambdaCodeS3Bucket: { Type: "String" },
@@ -80,6 +87,8 @@ function buildOutputs(): JsonMap {
     LambdaName: { Value: { Ref: "ForwarderLambdaFunction" } },
     EcsClusterArn: { Value: { Ref: "WebhookEcsCluster" } },
     EcsTaskDefinitionArn: { Value: { Ref: "WebhookTaskDefinition" } },
+    EcsSecurityGroupId: { Value: { Ref: "WebhookTaskSecurityGroup" } },
+    EcsSubnetIdsCsv: { Value: { "Fn::Join": [",", { Ref: "SubnetIds" }] } },
   };
 }
 
@@ -278,6 +287,44 @@ function buildEcsResources(): JsonMap {
             },
           ],
         },
+        Policies: [
+          {
+            PolicyName: "claude-bedrock-access",
+            PolicyDocument: {
+              Version: "2012-10-17",
+              Statement: [
+                {
+                  Sid: "AllowModelAndInferenceProfileAccess",
+                  Effect: "Allow",
+                  Action: [
+                    "bedrock:InvokeModel",
+                    "bedrock:InvokeModelWithResponseStream",
+                    "bedrock:ListInferenceProfiles",
+                  ],
+                  Resource: [
+                    "arn:aws:bedrock:*:*:inference-profile/*",
+                    "arn:aws:bedrock:*:*:application-inference-profile/*",
+                    "arn:aws:bedrock:*:*:foundation-model/*",
+                  ],
+                },
+                {
+                  Sid: "AllowMarketplaceSubscription",
+                  Effect: "Allow",
+                  Action: [
+                    "aws-marketplace:ViewSubscriptions",
+                    "aws-marketplace:Subscribe",
+                  ],
+                  Resource: "*",
+                  Condition: {
+                    StringEquals: {
+                      "aws:CalledViaLast": "bedrock.amazonaws.com",
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        ],
       },
     },
     WebhookTaskSecurityGroup: {
@@ -309,6 +356,17 @@ function buildEcsResources(): JsonMap {
             Image: "public.ecr.aws/docker/library/ubuntu:24.04",
             Essential: true,
             Command: ["/bin/bash", "-lc", WEBHOOK_TASK_COMMAND],
+            Environment: [
+              { Name: "ECS_AGENT", Value: { Ref: "AgentType" } },
+              { Name: "CLAUDE_CODE_USE_BEDROCK", Value: "1" },
+              { Name: "AWS_REGION", Value: { Ref: "AWS::Region" } },
+              { Name: "AWS_DEFAULT_REGION", Value: { Ref: "AWS::Region" } },
+              { Name: "ANTHROPIC_MODEL", Value: DEFAULT_BEDROCK_MODEL },
+              {
+                Name: "ANTHROPIC_DEFAULT_SONNET_MODEL",
+                Value: DEFAULT_BEDROCK_MODEL,
+              },
+            ],
             LogConfiguration: {
               LogDriver: "awslogs",
               Options: {
@@ -407,6 +465,7 @@ function buildLambdaResources(): JsonMap {
             ECS_SUBNET_IDS: { "Fn::Join": [",", { Ref: "SubnetIds" }] },
             ECS_ASSIGN_PUBLIC_IP: "ENABLED",
             ECS_CONTAINER_NAME: "webhook",
+            ECS_AGENT: { Ref: "AgentType" },
             PROMPT: { Ref: "Prompt" },
             GITHUB_TOKEN: { Ref: "GitHubToken" },
             ANTHROPIC_API_KEY: { Ref: "AnthropicApiKey" },

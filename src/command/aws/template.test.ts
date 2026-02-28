@@ -18,6 +18,7 @@ describe("buildTemplate", () => {
     expect(template.Parameters.WebhookSecret).toBeDefined();
     expect(template.Parameters.LambdaCodeS3Bucket).toBeDefined();
     expect(template.Parameters.Prompt).toBeDefined();
+    expect(template.Parameters.AgentType).toBeDefined();
     expect(template.Parameters.GitHubToken).toBeDefined();
     expect(template.Parameters.AnthropicApiKey).toBeDefined();
 
@@ -33,5 +34,26 @@ describe("buildTemplate", () => {
     expect(lambdaVars.ANTHROPIC_API_KEY).toBeDefined();
 
     expect(template.Outputs.ApiInvokeUrl).toBeDefined();
+    expect(template.Outputs.EcsSecurityGroupId).toBeDefined();
+    expect(template.Outputs.EcsSubnetIdsCsv).toBeDefined();
+
+    const taskRolePolicies = template.Resources.WebhookTaskRole.Properties.Policies;
+    expect(taskRolePolicies).toBeDefined();
+    const statement0Actions = taskRolePolicies[0].PolicyDocument.Statement[0].Action;
+    const statement1Actions = taskRolePolicies[0].PolicyDocument.Statement[1].Action;
+    expect(statement0Actions).toContain("bedrock:InvokeModel");
+    expect(statement0Actions).toContain("bedrock:InvokeModelWithResponseStream");
+    expect(statement0Actions).toContain("bedrock:ListInferenceProfiles");
+    expect(statement1Actions).toContain("aws-marketplace:ViewSubscriptions");
+    expect(statement1Actions).toContain("aws-marketplace:Subscribe");
+
+    const taskContainer = template.Resources.WebhookTaskDefinition.Properties.ContainerDefinitions[0];
+    const envNames = taskContainer.Environment.map((entry: { Name: string }) => entry.Name);
+    expect(envNames).toContain("CLAUDE_CODE_USE_BEDROCK");
+    expect(envNames).toContain("ECS_AGENT");
+    expect(envNames).toContain("ANTHROPIC_MODEL");
+    expect(envNames).toContain("ANTHROPIC_DEFAULT_SONNET_MODEL");
+
+    expect(lambdaVars.ECS_AGENT).toBeDefined();
   });
 });

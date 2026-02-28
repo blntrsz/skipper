@@ -31,6 +31,7 @@ type DeployOptions = {
   queueName?: string;
   apiName?: string;
   stageName?: string;
+  agent?: string;
   timeoutMinutes: number;
   dryRunTemplate?: boolean;
   tags?: string;
@@ -51,6 +52,7 @@ type DeployContext = {
   queueName: string;
   apiName: string;
   stageName: string;
+  agent: AgentType;
   githubRepo?: string;
   githubEvents: string[];
   webhookSecret: string;
@@ -67,6 +69,8 @@ export type DeployDefaults = {
   env: string;
   region: string;
 };
+
+type AgentType = "claude" | "opencode";
 
 /**
  * Register AWS deploy command.
@@ -89,6 +93,7 @@ export function registerAwsDeployCommand(program: Command): void {
     .option("--queue-name <name>", "SQS queue name")
     .option("--api-name <name>", "API Gateway name")
     .option("--stage-name <name>", "API Gateway stage name")
+    .option("--agent <name>", "ECS agent runtime (claude|opencode)")
     .option("--timeout-minutes <n>", "Wait timeout minutes", parseNumber, 30)
     .option("--tags <k=v,...>", "Stack tags")
     .option(
@@ -148,6 +153,7 @@ async function buildDeployContext(
     : await resolveGithubRepo(options.githubRepo);
   const githubEvents = parseGithubEvents(options.githubEvents);
   const webhookSecret = options.githubSecret ?? createWebhookSecret(service, env);
+  const agent = parseAgentType(options.agent ?? process.env.SKIPPER_AWS_AGENT ?? "claude");
   const prompt = options.prompt ?? process.env.PROMPT ?? "";
   const githubToken = options.githubToken ?? process.env.GITHUB_TOKEN ?? "";
   const anthropicApiKey =
@@ -162,6 +168,7 @@ async function buildDeployContext(
     queueName: options.queueName ?? `${service}-${env}-events`,
     apiName: options.apiName ?? `${service}-${env}-events-api`,
     stageName: options.stageName ?? env,
+    agent,
     githubRepo,
     githubEvents,
     webhookSecret,
@@ -196,6 +203,7 @@ function printDryRun(templateBody: string, context: DeployContext): void {
               secretConfigured: Boolean(context.webhookSecret),
             },
         runtime: {
+          agent: context.agent,
           promptConfigured: context.prompt.length > 0,
           githubTokenConfigured: context.githubToken.length > 0,
           anthropicApiKeyConfigured: context.anthropicApiKey.length > 0,
@@ -341,6 +349,7 @@ function createTemplateParameters(
     QueueName: context.queueName,
     ApiName: context.apiName,
     StageName: context.stageName,
+    AgentType: context.agent,
     VpcId: artifact.vpcId,
     SubnetIds: artifact.subnetIds.join(","),
     LambdaCodeS3Bucket: artifact.bucket,
@@ -610,6 +619,20 @@ function toBucketLocationConstraint(region: string): BucketLocationConstraint {
  */
 function createWebhookSecret(service: string, env: string): string {
   return `${service}-${env}-${randomBytes(24).toString("hex")}`;
+}
+
+/**
+ * Parse ECS agent type.
+ *
+ * @since 1.0.0
+ * @category AWS.Deploy
+ */
+function parseAgentType(value: string): AgentType {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "claude" || normalized === "opencode") {
+    return normalized;
+  }
+  throw new Error("agent must be claude or opencode");
 }
 
 /**

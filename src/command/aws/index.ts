@@ -1,5 +1,6 @@
 import type { Command } from "commander";
 import { registerAwsDeployCommand } from "./deploy.js";
+import { registerAwsRunCommand } from "./run.js";
 
 /**
  * Register AWS command namespace.
@@ -10,4 +11,5 @@ import { registerAwsDeployCommand } from "./deploy.js";
 export function registerAwsCommand(program: Command) {
   const aws = program.command("aws").description("AWS commands");
   registerAwsDeployCommand(aws);
+  registerAwsRunCommand(aws);
 }
