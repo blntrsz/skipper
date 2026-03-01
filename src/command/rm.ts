@@ -11,6 +11,10 @@ type WorktreeRef = {
   path: string;
 };
 
+type RemoveCommandOptions = {
+  force?: boolean;
+};
+
 /**
  * Register remove worktree command.
  *
@@ -21,6 +25,7 @@ export function registerRemoveCommand(program: Command): void {
   program
     .command("rm")
     .description("Remove a worktree (repo+worktree)")
+    .option("-f, --force", "Force remove worktree with uncommitted changes")
     .action(runRemoveCommand);
 }
 
@@ -30,7 +35,8 @@ export function registerRemoveCommand(program: Command): void {
  * @since 1.0.0
  * @category Worktree
  */
-async function runRemoveCommand(): Promise<void> {
+async function runRemoveCommand(options: RemoveCommandOptions = {}): Promise<void> {
+  const force = options.force === true;
   const worktreeBaseDir = `${process.env.HOME}/.local/share/skipper/worktree`;
   const allWorktrees = await collectWorktrees(worktreeBaseDir);
   assertNonEmpty(allWorktrees, "No worktrees found");
@@ -39,7 +45,7 @@ async function runRemoveCommand(): Promise<void> {
     console.log("No worktree selected");
     process.exit(0);
   }
-  await removeWorktree(selected);
+  await removeWorktree(selected, force);
 }
 
 /**
@@ -85,13 +91,13 @@ async function selectWorktree(worktrees: WorktreeRef[]): Promise<WorktreeRef | u
  * @since 1.0.0
  * @category Worktree
  */
-async function removeWorktree(target: WorktreeRef): Promise<void> {
+async function removeWorktree(target: WorktreeRef, force: boolean): Promise<void> {
   const githubDir = `${process.env.HOME}/.local/share/github`;
   const repoPath = `${githubDir}/${target.repo}`;
   const sessionName = `${target.repo}-${target.worktree}`;
   const name = `${target.repo}/${target.worktree}`;
   console.log(`Removing worktree: ${name}`);
-  await removeGitWorktree(repoPath, target.path);
+  await removeGitWorktree(repoPath, target.path, force);
   await Bun.$`rm -rf ${target.path}`;
   if (await tmuxSessionExists(sessionName)) {
     await Bun.$`tmux kill-session -t ${sessionName}`;
@@ -106,11 +112,18 @@ async function removeWorktree(target: WorktreeRef): Promise<void> {
  * @since 1.0.0
  * @category Worktree
  */
-async function removeGitWorktree(repoPath: string, worktreePath: string): Promise<void> {
-  const result = await Bun.$`git -C ${repoPath} worktree remove ${worktreePath}`.nothrow();
+async function removeGitWorktree(
+  repoPath: string,
+  worktreePath: string,
+  force: boolean,
+): Promise<void> {
+  const result = force
+    ? await Bun.$`git -C ${repoPath} worktree remove --force ${worktreePath}`.nothrow()
+    : await Bun.$`git -C ${repoPath} worktree remove ${worktreePath}`.nothrow();
   if (result.exitCode === 0) return;
   const stderr = result.stderr.toString().trim();
-  const fallback = `git worktree remove failed with code ${result.exitCode}`;
+  const command = force ? "git worktree remove --force" : "git worktree remove";
+  const fallback = `${command} failed with code ${result.exitCode}`;
   throw new Error(stderr || fallback);
 }
 
