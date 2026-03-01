@@ -31,6 +31,7 @@ const assignPublicIp = process.env.ECS_ASSIGN_PUBLIC_IP === "DISABLED" ? "DISABL
 const containerName = process.env.ECS_CONTAINER_NAME ?? "webhook";
 const workersStackName = process.env.WORKERS_STACK_NAME?.trim() ?? "";
 const workersSha256 = process.env.WORKERS_SHA256?.trim() ?? "";
+const workerIdFilter = process.env.SKIPPER_WORKER_ID?.trim() ?? "";
 
 const webhooks = new Webhooks({ secret: webhookSecret });
 const ecs = new ECSClient({ region: process.env.AWS_REGION });
@@ -370,18 +371,40 @@ function buildTaskEnvironments(
     pushOptionalEnv(baseEnvironment, "GITHUB_ISSUE_URL", issueContext.url);
   }
   if (!manifest) {
+    if (workerIdFilter.length > 0) {
+      throw new Error("worker-scoped lambda missing workers manifest");
+    }
     return [buildLegacyTaskEnvironment(payload, baseEnvironment)];
   }
-  const matchedWorkers = routeWorkers(manifest, {
-    provider: "github",
-    event: webhookMeta.githubEvent,
-    action: payload.action,
-    repository: payload.repository?.full_name,
-    baseBranch: payload.pull_request?.base?.ref,
-    headBranch: payload.pull_request?.head?.ref,
-    draft: payload.pull_request?.draft,
-  });
+  const matchedWorkers = filterWorkersById(
+    routeWorkers(manifest, {
+      provider: "github",
+      event: webhookMeta.githubEvent,
+      action: payload.action,
+      repository: payload.repository?.full_name,
+      baseBranch: payload.pull_request?.base?.ref,
+      headBranch: payload.pull_request?.head?.ref,
+      draft: payload.pull_request?.draft,
+    }),
+    workerIdFilter,
+  );
   return matchedWorkers.map((worker) => buildWorkerTaskEnvironment(baseEnvironment, worker));
+}
+
+/**
+ * Filter matched workers when lambda is scoped to one worker id.
+ *
+ * @since 1.0.0
+ * @category AWS.Lambda
+ */
+function filterWorkersById(
+  workers: WorkerManifest["workers"],
+  workerId: string,
+): WorkerManifest["workers"] {
+  if (workerId.length === 0) {
+    return workers;
+  }
+  return workers.filter((worker) => worker.metadata.id === workerId);
 }
 
 /**

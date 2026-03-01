@@ -11,7 +11,11 @@ import {
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Command } from "commander";
 import { parseUnknownJson } from "../../shared/validation/parse-json.js";
-import { collectGithubEventsFromWorkers } from "../../worker/github-events.js";
+import {
+  collectGithubEventSubscriptions,
+  collectGithubEventsFromWorkers,
+  type WorkerGithubEventSubscription,
+} from "../../worker/github-events.js";
 import { loadWorkers } from "../../worker/load.js";
 import { encodeWorkerManifest } from "../../worker/serialize.js";
 import { deployStack, getFailureSummary } from "./cloudformation.js";
@@ -46,6 +50,7 @@ type DeployContext = {
   repositoryPrefix: string;
   workerCount: number;
   workerIds: string[];
+  workerSubscriptions: WorkerGithubEventSubscription[];
   workerManifestByteLength: number;
   workerParameterValues: Record<string, string>;
   workerEvents: string[];
@@ -62,6 +67,7 @@ type DeployContext = {
   ecsSubnetIdsCsv: string;
   webhookSecretParameterName: string;
   lambdaArtifactsBucketName: string;
+  githubToken?: string;
 };
 
 type LambdaArtifact = {
@@ -120,7 +126,9 @@ async function handleDeployAction(
   options: DeployOptions,
 ): Promise<void> {
   const context = await buildDeployContext(serviceArg, envArg, options);
-  const templateBody = buildDeployTemplate();
+  const templateBody = buildDeployTemplate({
+    workerSubscriptions: context.workerSubscriptions,
+  });
   if (options.dryRunTemplate) {
     printDryRun(templateBody, context);
     return;
@@ -150,12 +158,14 @@ async function buildDeployContext(
   if ((options.strictWorkers ?? false) && workers.length === 0) {
     throw new Error("no workers found in .skipper/worker/*.ts");
   }
+  const workerSubscriptions = collectGithubEventSubscriptions(workers);
   const encodedWorkers = encodeWorkerManifest({ workers });
   const repositoryFullName = await resolveGithubRepo(options.githubRepo, process.env, rootDir);
   if (!repositoryFullName) {
     throw new Error("github repo not found from current repo; pass --github-repo");
   }
   const repositoryPrefix = toRepositoryPrefix(repositoryFullName);
+  const githubToken = await resolveOptionalGithubToken(rootDir);
   const stackName =
     options.stackName ?? buildRepoScopedStackName(repositoryPrefix, service, env);
   const bootstrapStackName =
@@ -179,6 +189,7 @@ async function buildDeployContext(
     repositoryPrefix,
     workerCount: encodedWorkers.workerCount,
     workerIds: workers.map((worker) => worker.metadata.id),
+    workerSubscriptions,
     workerManifestByteLength: encodedWorkers.byteLength,
     workerParameterValues: encodedWorkers.parameterValues,
     workerEvents: collectGithubEventsFromWorkers(workers),
@@ -195,6 +206,7 @@ async function buildDeployContext(
     ecsSubnetIdsCsv: shared.ecsSubnetIdsCsv,
     webhookSecretParameterName: shared.webhookSecretParameterName,
     lambdaArtifactsBucketName: shared.lambdaArtifactsBucketName,
+    githubToken,
   };
 }
 
@@ -348,10 +360,30 @@ function createDeployTemplateParameters(
     EcsSecurityGroupId: context.ecsSecurityGroupId,
     EcsSubnetIdsCsv: context.ecsSubnetIdsCsv,
     WebhookSecretParameterName: context.webhookSecretParameterName,
+    GitHubToken: context.githubToken ?? "",
     LambdaCodeS3Bucket: artifact.bucket,
     LambdaCodeS3Key: artifact.key,
     ...context.workerParameterValues,
   };
+}
+
+/**
+ * Resolve optional GitHub token from env or gh auth.
+ *
+ * @since 1.0.0
+ * @category AWS.Deploy
+ */
+async function resolveOptionalGithubToken(cwd: string): Promise<string | undefined> {
+  const tokenFromEnv = process.env.GITHUB_TOKEN?.trim() ?? process.env.GH_TOKEN?.trim() ?? "";
+  if (tokenFromEnv.length > 0) {
+    return tokenFromEnv;
+  }
+  const tokenFromGh = await Bun.$`gh auth token`.cwd(cwd).nothrow().text();
+  const normalized = tokenFromGh.trim();
+  if (normalized.length === 0) {
+    return undefined;
+  }
+  return normalized;
 }
 
 /**
@@ -380,6 +412,8 @@ function printDryRun(templateBody: string, context: DeployContext): void {
           rootDir: context.rootDir,
           workerCount: context.workerCount,
           workerIds: context.workerIds,
+          lambdaSubscriptionCount: context.workerSubscriptions.length,
+          lambdaSubscriptions: context.workerSubscriptions,
           serializedJsonBytes: context.workerManifestByteLength,
           workerParameterKeys: Object.keys(context.workerParameterValues).sort(),
           events: context.workerEvents,
@@ -411,7 +445,7 @@ function printDryRun(templateBody: string, context: DeployContext): void {
  * @category AWS.Deploy
  */
 async function buildAndUploadLambdaArtifact(context: DeployContext): Promise<LambdaArtifact> {
-  const tempDir = await mkdtemp(join(tmpdir(), "skipper-repo-forwarder-"));
+  const tempDir = await mkdtemp(join(tmpdir(), "skipper-worker-subscription-"));
   const bundleFile = join(tempDir, "index.js");
   const zipFile = join(tempDir, "lambda.zip");
   try {
@@ -419,7 +453,7 @@ async function buildAndUploadLambdaArtifact(context: DeployContext): Promise<Lam
     await Bun.$`zip -q -j ${zipFile} ${bundleFile}`;
     const zipBytes = new Uint8Array(await Bun.file(zipFile).arrayBuffer());
     const sha256 = createHash("sha256").update(zipBytes).digest("hex");
-    const key = `lambda/repository-forwarder/${sha256}.zip`;
+    const key = `lambda/worker-subscription/${sha256}.zip`;
     const s3 = new S3Client({ region: context.region });
     await s3.send(
       new PutObjectCommand({

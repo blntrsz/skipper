@@ -19,9 +19,17 @@ test("buildRepoScopedStackName caps length at 128", () => {
 });
 
 test("buildDeployTemplate includes repository scoped event pattern", () => {
-  const template = JSON.parse(buildDeployTemplate()) as {
+  const template = JSON.parse(
+    buildDeployTemplate({
+      workerSubscriptions: [
+        { workerId: "issue-solver", events: ["issues"] },
+        { workerId: "review", events: ["pull_request"] },
+      ],
+    }),
+  ) as {
     Resources: Record<string, any>;
     Parameters: Record<string, any>;
+    Outputs: Record<string, any>;
   };
 
   expect(template.Parameters.RepositoryFullName).toBeDefined();
@@ -33,29 +41,53 @@ test("buildDeployTemplate includes repository scoped event pattern", () => {
   expect(template.Parameters.EcsSecurityGroupId).toBeDefined();
   expect(template.Parameters.EcsSubnetIdsCsv).toBeDefined();
   expect(template.Parameters.WebhookSecretParameterName).toBeDefined();
+  expect(template.Parameters.GitHubToken).toBeDefined();
   expect(template.Parameters.LambdaCodeS3Bucket).toBeDefined();
   expect(template.Parameters.LambdaCodeS3Key).toBeDefined();
   expect(template.Parameters.WorkersSha256).toBeDefined();
   expect(template.Parameters.WorkersChunk00).toBeDefined();
 
-  const rule = template.Resources.RepositoryEventRule;
-  expect(rule).toBeDefined();
-  expect(rule.Type).toBe("AWS::Events::Rule");
-  expect(rule.Properties.EventPattern.detail.repository.full_name[0].Ref).toBe(
-    "RepositoryFullName",
+  const lambdaEntries = Object.entries(template.Resources).filter(
+    ([, resource]) => resource.Type === "AWS::Lambda::Function",
   );
-  expect(rule.Properties.EventPattern.source[0].Ref).toBe("EventSource");
-  expect(rule.Properties.EventPattern["detail-type"][0].Ref).toBe("EventDetailType");
-  expect(rule.Properties.Targets[0].Id).toBe("RepositoryForwarderLambda");
+  expect(lambdaEntries).toHaveLength(2);
 
-  const lambda = template.Resources.RepositoryForwarderLambdaFunction;
-  expect(lambda).toBeDefined();
-  expect(lambda.Type).toBe("AWS::Lambda::Function");
-  expect(lambda.Properties.Environment.Variables.ECS_CLUSTER_ARN.Ref).toBe("EcsClusterArn");
-  expect(lambda.Properties.Environment.Variables.WEBHOOK_SECRET["Fn::Sub"]).toContain(
-    "resolve:ssm:",
-  );
+  const expectedEventsByWorker = new Map([
+    ["issue-solver", ["issues"]],
+    ["review", ["pull_request"]],
+  ]);
+  for (const [logicalId, lambda] of lambdaEntries) {
+    const workerId = lambda.Properties.Environment.Variables.SKIPPER_WORKER_ID;
+    expect(workerId).toBeDefined();
+    expect(lambda.Properties.Environment.Variables.ECS_CLUSTER_ARN.Ref).toBe("EcsClusterArn");
+    expect(lambda.Properties.Environment.Variables.WEBHOOK_SECRET["Fn::Sub"]).toContain(
+      "resolve:ssm:",
+    );
+    expect(lambda.Properties.Environment.Variables.GITHUB_TOKEN.Ref).toBe("GitHubToken");
 
-  expect(template.Resources.RepositoryForwarderLambdaRole).toBeDefined();
-  expect(template.Resources.RepositoryForwarderLambdaInvokePermission).toBeDefined();
+    const expectedEvents = expectedEventsByWorker.get(workerId);
+    expect(expectedEvents).toBeDefined();
+    expectedEventsByWorker.delete(workerId);
+
+    const eventRule = template.Resources[logicalId.replace(/LambdaFunction$/, "EventRule")];
+    expect(eventRule).toBeDefined();
+    expect(eventRule.Type).toBe("AWS::Events::Rule");
+    expect(eventRule.Properties.EventPattern.detail.repository.full_name[0].Ref).toBe(
+      "RepositoryFullName",
+    );
+    expect(eventRule.Properties.EventPattern.source[0].Ref).toBe("EventSource");
+    expect(eventRule.Properties.EventPattern["detail-type"][0].Ref).toBe("EventDetailType");
+    expect(eventRule.Properties.EventPattern.detail.headers["x-github-event"]).toEqual(
+      expectedEvents,
+    );
+
+    const permission =
+      template.Resources[logicalId.replace(/LambdaFunction$/, "LambdaInvokePermission")];
+    expect(permission).toBeDefined();
+    expect(permission.Type).toBe("AWS::Lambda::Permission");
+  }
+  expect(expectedEventsByWorker.size).toBe(0);
+
+  expect(template.Resources.RepositoryWorkerLambdaRole).toBeDefined();
+  expect(template.Outputs.WorkerSubscriptionCount.Value).toBe("2");
 });
