@@ -273,6 +273,13 @@ type IssueContext = {
   url?: string;
 };
 
+type PullRequestContext = {
+  number: string;
+  url?: string;
+  headSha?: string;
+  baseSha?: string;
+};
+
 /**
  * Infer GitHub event type from payload shape.
  *
@@ -303,6 +310,37 @@ function readIssueContext(payload: GitHubPayload): IssueContext | undefined {
   return {
     number: String(issueNumber),
     url: issueUrl && issueUrl.length > 0 ? issueUrl : undefined,
+  };
+}
+
+/**
+ * Read normalized pull request context from webhook payload.
+ *
+ * @since 1.0.0
+ * @category AWS.Lambda
+ */
+function readPullRequestContext(payload: GitHubPayload): PullRequestContext | undefined {
+  if (!payload.pull_request) return undefined;
+  const pullRequestNumber =
+    payload.pull_request.number ??
+    (typeof (payload as Record<string, unknown>).number === "number"
+      ? ((payload as Record<string, unknown>).number as number)
+      : undefined);
+  if (
+    typeof pullRequestNumber !== "number" ||
+    !Number.isInteger(pullRequestNumber) ||
+    pullRequestNumber <= 0
+  ) {
+    return undefined;
+  }
+  const pullRequestUrl = payload.pull_request.html_url?.trim();
+  const headSha = payload.pull_request.head?.sha?.trim();
+  const baseSha = payload.pull_request.base?.sha?.trim();
+  return {
+    number: String(pullRequestNumber),
+    url: pullRequestUrl && pullRequestUrl.length > 0 ? pullRequestUrl : undefined,
+    headSha: headSha && headSha.length > 0 ? headSha : undefined,
+    baseSha: baseSha && baseSha.length > 0 ? baseSha : undefined,
   };
 }
 
@@ -351,7 +389,7 @@ async function verifyWebhookBody(rawBody: string, signature: string): Promise<vo
  * @since 1.0.0
  * @category AWS.Lambda
  */
-function buildTaskEnvironments(
+export function buildTaskEnvironments(
   payload: GitHubPayload,
   webhookMeta: WebhookMeta,
   manifest: WorkerManifest | undefined,
@@ -369,6 +407,13 @@ function buildTaskEnvironments(
   if (issueContext) {
     baseEnvironment.push({ name: "GITHUB_ISSUE_NUMBER", value: issueContext.number });
     pushOptionalEnv(baseEnvironment, "GITHUB_ISSUE_URL", issueContext.url);
+  }
+  const pullRequestContext = readPullRequestContext(payload);
+  if (pullRequestContext) {
+    baseEnvironment.push({ name: "GITHUB_PR_NUMBER", value: pullRequestContext.number });
+    pushOptionalEnv(baseEnvironment, "GITHUB_PR_URL", pullRequestContext.url);
+    pushOptionalEnv(baseEnvironment, "GITHUB_PR_HEAD_SHA", pullRequestContext.headSha);
+    pushOptionalEnv(baseEnvironment, "GITHUB_PR_BASE_SHA", pullRequestContext.baseSha);
   }
   if (!manifest) {
     if (workerIdFilter.length > 0) {
