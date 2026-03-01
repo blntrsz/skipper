@@ -42,6 +42,12 @@ describe("buildTemplate", () => {
     expect(template.Resources.LambdaArtifactsBucket).toBeDefined();
     expect(template.Resources.WebhookEcsCluster).toBeDefined();
     expect(template.Resources.WebhookTaskDefinition).toBeDefined();
+    const taskCommand =
+      template.Resources.WebhookTaskDefinition.Properties.ContainerDefinitions[0].Command[2];
+    expect(taskCommand).toContain("apt-get install -y curl git ca-certificates unzip nodejs gh");
+    expect(taskCommand).toContain('GH_TOKEN="${GH_TOKEN:-${GITHUB_TOKEN:-}}"');
+    expect(taskCommand).toContain("opencode run -m");
+    expect(taskCommand).toContain("amazon-bedrock/");
 
     const method = template.Resources.ApiGatewayMethodPostEvents;
     const integration = method.Properties.Integration;
