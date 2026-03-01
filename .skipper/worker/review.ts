@@ -19,7 +19,7 @@ const reviewWorker = {
     mode: "comment-only",
     allowPush: false,
     prompt:
-      "Review this pull request. Focus on correctness, regressions, security, and test gaps. Provide concise actionable feedback as comments only. Do not modify files, commit, or push.",
+      "Review this pull request and submit one consolidated review with all comments in a single batch. Only report major or minor issues (correctness, regressions, security, reliability, and meaningful test gaps). Ignore nitpicks or style-only feedback. Keep comments concise and actionable. Do not modify files, commit, or push.",
   },
 } satisfies WorkerDefinition;
 
