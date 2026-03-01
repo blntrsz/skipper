@@ -2,7 +2,8 @@ import { Glob } from "bun";
 import type { $ } from "bun";
 
 const DIRECTORY_GLOB = new Glob("*");
-const FZF_CANCELLED_EXIT_CODES = new Set([1, 130]);
+const FZF_NO_MATCH_EXIT_CODE = 1;
+const FZF_CANCELLED_EXIT_CODES = new Set([130]);
 
 /**
  * List direct directory entries.
@@ -78,8 +79,13 @@ export async function selectOrQueryWithFzf(
 async function runFzf(values: string[], args: string[]): Promise<string | undefined> {
   const input = values.join("\n");
   const result = await Bun.$`echo ${input} | fzf ${args}`.nothrow();
+  const output = result.stdout.toString();
   if (result.exitCode === 0) {
-    return result.text();
+    return output;
+  }
+  if (result.exitCode === FZF_NO_MATCH_EXIT_CODE) {
+    if (output.trim().length > 0) return output;
+    return undefined;
   }
   if (FZF_CANCELLED_EXIT_CODES.has(result.exitCode)) {
     return undefined;
