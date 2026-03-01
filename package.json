@@ -1,9 +1,17 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "skipper",
+  "name": "@skippercorp/skipper",
+  "version": "1.0.0",
   "module": "index.ts",
   "type": "module",
-  "private": true,
+  "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "src/**/*.ts",
+    "!src/**/*.test.ts"
+  ],
   "bin": {
     "skipper": "./src/index.ts"
   },
@@ -13,9 +21,13 @@
     "lint": "bun run typecheck && bun run ./scripts/check-source-standards.ts",
     "test": "bun test",
     "test:e2e:issue-subscription": "bun run ./scripts/verify-issue-subscription-e2e.ts",
-    "build": "bun build ./src/index.ts --compile --outfile bin/skipper"
+    "build": "bun build ./src/index.ts --compile --outfile bin/skipper",
+    "changeset": "changeset",
+    "version-packages": "changeset version",
+    "release": "changeset publish"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.29.0",
     "@types/bun": "latest"
   },
   "peerDependencies": {

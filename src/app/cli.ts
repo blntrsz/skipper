@@ -1,5 +1,11 @@
 import { Command } from "commander";
+import packageJson from "../../package.json";
 import { registerCommands } from "./register-commands.js";
+
+const packageVersion =
+  typeof packageJson.version === "string" && packageJson.version.length > 0
+    ? packageJson.version
+    : "0.0.0";
 
 /**
  * Build configured CLI program.
@@ -9,7 +15,7 @@ import { registerCommands } from "./register-commands.js";
  */
 export function createProgram(): Command {
   const program = new Command();
-  program.name("skipper").description("CLI tool").version("1.0.0");
+  program.name("skipper").description("CLI tool").version(packageVersion);
   registerCommands(program);
   return program;
 }
