@@ -117,8 +117,14 @@ function buildOutputs(): JsonMap {
     EventDetailType: { Value: { Ref: "EventDetailType" } },
     EcsClusterArn: { Value: { Ref: "WebhookEcsCluster" } },
     EcsTaskDefinitionArn: { Value: { Ref: "WebhookTaskDefinition" } },
+    EcsTaskExecutionRoleArn: {
+      Value: { "Fn::GetAtt": ["WebhookTaskExecutionRole", "Arn"] },
+    },
+    EcsTaskRoleArn: { Value: { "Fn::GetAtt": ["WebhookTaskRole", "Arn"] } },
     EcsSecurityGroupId: { Value: { Ref: "WebhookTaskSecurityGroup" } },
     EcsSubnetIdsCsv: { Value: { "Fn::Join": [",", { Ref: "SubnetIds" }] } },
+    WebhookSecretParameterName: { Value: { Ref: "WebhookSecretParameter" } },
+    LambdaArtifactsBucketName: { Value: { Ref: "LambdaArtifactsBucket" } },
   };
 }
 
@@ -223,7 +229,7 @@ function buildResources(): JsonMap {
         MethodResponses: [{ StatusCode: "200" }],
       },
     },
-    ApiGatewayDeployment: {
+    ApiGatewayDeploymentV2: {
       Type: "AWS::ApiGateway::Deployment",
       DependsOn: ["ApiGatewayMethodPostEvents"],
       Properties: { RestApiId: { Ref: "ApiGatewayRestApi" } },
@@ -232,9 +238,22 @@ function buildResources(): JsonMap {
       Type: "AWS::ApiGateway::Stage",
       Properties: {
         RestApiId: { Ref: "ApiGatewayRestApi" },
-        DeploymentId: { Ref: "ApiGatewayDeployment" },
+        DeploymentId: { Ref: "ApiGatewayDeploymentV2" },
         StageName: { Ref: "StageName" },
       },
+    },
+    WebhookSecretParameter: {
+      Type: "AWS::SSM::Parameter",
+      Properties: {
+        Name: {
+          "Fn::Sub": "/skipper/${ServiceName}/${Environment}/webhook-secret",
+        },
+        Type: "String",
+        Value: { Ref: "WebhookSecret" },
+      },
+    },
+    LambdaArtifactsBucket: {
+      Type: "AWS::S3::Bucket",
     },
     ...buildEcsResources(),
   };

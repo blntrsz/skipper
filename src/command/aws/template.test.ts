@@ -28,11 +28,18 @@ describe("buildTemplate", () => {
     expect(template.Outputs.EventDetailType).toBeDefined();
     expect(template.Outputs.EcsClusterArn).toBeDefined();
     expect(template.Outputs.EcsTaskDefinitionArn).toBeDefined();
+    expect(template.Outputs.EcsTaskExecutionRoleArn).toBeDefined();
+    expect(template.Outputs.EcsTaskRoleArn).toBeDefined();
     expect(template.Outputs.EcsSecurityGroupId).toBeDefined();
     expect(template.Outputs.EcsSubnetIdsCsv).toBeDefined();
+    expect(template.Outputs.WebhookSecretParameterName).toBeDefined();
+    expect(template.Outputs.LambdaArtifactsBucketName).toBeDefined();
 
     expect(template.Resources.IngressQueue).toBeUndefined();
     expect(template.Resources.ForwarderLambdaFunction).toBeUndefined();
+    expect(template.Resources.WebhookSecretParameter).toBeDefined();
+    expect(template.Resources.WebhookSecretParameter.Properties.Type).toBe("String");
+    expect(template.Resources.LambdaArtifactsBucket).toBeDefined();
     expect(template.Resources.WebhookEcsCluster).toBeDefined();
     expect(template.Resources.WebhookTaskDefinition).toBeDefined();
 

@@ -1,13 +1,19 @@
 import { createHash } from "node:crypto";
+import { mkdtemp, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
 import {
   CloudFormationClient,
   DescribeStacksCommand,
   type Output,
 } from "@aws-sdk/client-cloudformation";
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import type { Command } from "commander";
 import { parseUnknownJson } from "../../shared/validation/parse-json.js";
 import { collectGithubEventsFromWorkers } from "../../worker/github-events.js";
 import { loadWorkers } from "../../worker/load.js";
+import { encodeWorkerManifest } from "../../worker/serialize.js";
 import { deployStack, getFailureSummary } from "./cloudformation.js";
 import { parseTags, resolveDeployDefaults } from "./defaults.js";
 import { buildDeployTemplate } from "./deploy-template.js";
@@ -39,13 +45,34 @@ type DeployContext = {
   repositoryFullName: string;
   repositoryPrefix: string;
   workerCount: number;
+  workerIds: string[];
+  workerManifestByteLength: number;
+  workerParameterValues: Record<string, string>;
   workerEvents: string[];
   timeoutMinutes: number;
   tags?: Record<string, string>;
   eventBusName: string;
   eventSource: string;
   eventDetailType: string;
+  ecsClusterArn: string;
+  ecsTaskDefinitionArn: string;
+  ecsTaskExecutionRoleArn: string;
+  ecsTaskRoleArn: string;
+  ecsSecurityGroupId: string;
+  ecsSubnetIdsCsv: string;
+  webhookSecretParameterName: string;
+  lambdaArtifactsBucketName: string;
 };
+
+type LambdaArtifact = {
+  bucket: string;
+  key: string;
+  sha256: string;
+};
+
+const EVENTBRIDGE_LAMBDA_ENTRY = fileURLToPath(
+  new URL("./lambda/eventbridge-handler.ts", import.meta.url),
+);
 
 /**
  * Register aws deploy command.
@@ -123,6 +150,7 @@ async function buildDeployContext(
   if ((options.strictWorkers ?? false) && workers.length === 0) {
     throw new Error("no workers found in .skipper/worker/*.ts");
   }
+  const encodedWorkers = encodeWorkerManifest({ workers });
   const repositoryFullName = await resolveGithubRepo(options.githubRepo, process.env, rootDir);
   if (!repositoryFullName) {
     throw new Error("github repo not found from current repo; pass --github-repo");
@@ -132,7 +160,7 @@ async function buildDeployContext(
     options.stackName ?? buildRepoScopedStackName(repositoryPrefix, service, env);
   const bootstrapStackName =
     options.bootstrapStackName ?? `${service}-${env}-bootstrap`;
-  const shared = await resolveSharedEventConfig({
+  const shared = await resolveSharedDeployConfig({
     region,
     bootstrapStackName,
     eventBusName: options.eventBusName,
@@ -149,17 +177,28 @@ async function buildDeployContext(
     bootstrapStackName,
     repositoryFullName,
     repositoryPrefix,
-    workerCount: workers.length,
+    workerCount: encodedWorkers.workerCount,
+    workerIds: workers.map((worker) => worker.metadata.id),
+    workerManifestByteLength: encodedWorkers.byteLength,
+    workerParameterValues: encodedWorkers.parameterValues,
     workerEvents: collectGithubEventsFromWorkers(workers),
     timeoutMinutes: options.timeoutMinutes,
     tags: parseTags(options.tags),
     eventBusName: shared.eventBusName,
     eventSource: shared.eventSource,
     eventDetailType: shared.eventDetailType,
+    ecsClusterArn: shared.ecsClusterArn,
+    ecsTaskDefinitionArn: shared.ecsTaskDefinitionArn,
+    ecsTaskExecutionRoleArn: shared.ecsTaskExecutionRoleArn,
+    ecsTaskRoleArn: shared.ecsTaskRoleArn,
+    ecsSecurityGroupId: shared.ecsSecurityGroupId,
+    ecsSubnetIdsCsv: shared.ecsSubnetIdsCsv,
+    webhookSecretParameterName: shared.webhookSecretParameterName,
+    lambdaArtifactsBucketName: shared.lambdaArtifactsBucketName,
   };
 }
 
-type SharedEventConfigInput = {
+type SharedDeployConfigInput = {
   region: string;
   bootstrapStackName: string;
   eventBusName?: string;
@@ -168,10 +207,18 @@ type SharedEventConfigInput = {
   service: string;
 };
 
-type SharedEventConfig = {
+type SharedDeployConfig = {
   eventBusName: string;
   eventSource: string;
   eventDetailType: string;
+  ecsClusterArn: string;
+  ecsTaskDefinitionArn: string;
+  ecsTaskExecutionRoleArn: string;
+  ecsTaskRoleArn: string;
+  ecsSecurityGroupId: string;
+  ecsSubnetIdsCsv: string;
+  webhookSecretParameterName: string;
+  lambdaArtifactsBucketName: string;
 };
 
 /**
@@ -180,15 +227,10 @@ type SharedEventConfig = {
  * @since 1.0.0
  * @category AWS.Deploy
  */
-async function resolveSharedEventConfig(
-  input: SharedEventConfigInput,
-): Promise<SharedEventConfig> {
-  const needBootstrapLookup =
-    !input.eventBusName || !input.eventSource || !input.eventDetailType;
-  let outputs: Output[] = [];
-  if (needBootstrapLookup) {
-    outputs = await readStackOutputs(input.region, input.bootstrapStackName);
-  }
+async function resolveSharedDeployConfig(
+  input: SharedDeployConfigInput,
+): Promise<SharedDeployConfig> {
+  const outputs = await readStackOutputs(input.region, input.bootstrapStackName);
   const eventBusName =
     input.eventBusName ?? readOutput(outputs, "EventBusName");
   if (!eventBusName) {
@@ -206,6 +248,34 @@ async function resolveSharedEventConfig(
       input.eventDetailType ??
       readOutput(outputs, "EventDetailType") ??
       "WebhookReceived",
+    ecsClusterArn: readRequiredOutput(outputs, "EcsClusterArn", input.bootstrapStackName),
+    ecsTaskDefinitionArn: readRequiredOutput(
+      outputs,
+      "EcsTaskDefinitionArn",
+      input.bootstrapStackName,
+    ),
+    ecsTaskExecutionRoleArn: readRequiredOutput(
+      outputs,
+      "EcsTaskExecutionRoleArn",
+      input.bootstrapStackName,
+    ),
+    ecsTaskRoleArn: readRequiredOutput(outputs, "EcsTaskRoleArn", input.bootstrapStackName),
+    ecsSecurityGroupId: readRequiredOutput(
+      outputs,
+      "EcsSecurityGroupId",
+      input.bootstrapStackName,
+    ),
+    ecsSubnetIdsCsv: readRequiredOutput(outputs, "EcsSubnetIdsCsv", input.bootstrapStackName),
+    webhookSecretParameterName: readRequiredOutput(
+      outputs,
+      "WebhookSecretParameterName",
+      input.bootstrapStackName,
+    ),
+    lambdaArtifactsBucketName: readRequiredOutput(
+      outputs,
+      "LambdaArtifactsBucketName",
+      input.bootstrapStackName,
+    ),
   };
 }
 
@@ -222,7 +292,7 @@ async function readStackOutputs(region: string, stackName: string): Promise<Outp
     return response.Stacks?.[0]?.Outputs ?? [];
   } catch {
     throw new Error(
-      `bootstrap stack not found: ${stackName}; run aws bootstrap or pass --event-bus-name/--event-source/--event-detail-type`,
+      `bootstrap stack not found: ${stackName}; run aws bootstrap`,
     );
   }
 }
@@ -238,12 +308,31 @@ function readOutput(outputs: Output[], key: string): string | undefined {
 }
 
 /**
+ * Read required output value.
+ *
+ * @since 1.0.0
+ * @category AWS.Deploy
+ */
+function readRequiredOutput(outputs: Output[], key: string, stackName: string): string {
+  const value = readOutput(outputs, key);
+  if (value) {
+    return value;
+  }
+  throw new Error(
+    `Missing ${key} in ${stackName}; re-run aws bootstrap to refresh shared outputs`,
+  );
+}
+
+/**
  * Build CloudFormation parameters for repo-scoped deploy template.
  *
  * @since 1.0.0
  * @category AWS.Deploy
  */
-function createDeployTemplateParameters(context: DeployContext): Record<string, string> {
+function createDeployTemplateParameters(
+  context: DeployContext,
+  artifact: LambdaArtifact,
+): Record<string, string> {
   return {
     ServiceName: context.service,
     Environment: context.env,
@@ -252,6 +341,16 @@ function createDeployTemplateParameters(context: DeployContext): Record<string, 
     EventBusName: context.eventBusName,
     EventSource: context.eventSource,
     EventDetailType: context.eventDetailType,
+    EcsClusterArn: context.ecsClusterArn,
+    EcsTaskDefinitionArn: context.ecsTaskDefinitionArn,
+    EcsTaskExecutionRoleArn: context.ecsTaskExecutionRoleArn,
+    EcsTaskRoleArn: context.ecsTaskRoleArn,
+    EcsSecurityGroupId: context.ecsSecurityGroupId,
+    EcsSubnetIdsCsv: context.ecsSubnetIdsCsv,
+    WebhookSecretParameterName: context.webhookSecretParameterName,
+    LambdaCodeS3Bucket: artifact.bucket,
+    LambdaCodeS3Key: artifact.key,
+    ...context.workerParameterValues,
   };
 }
 
@@ -280,7 +379,22 @@ function printDryRun(templateBody: string, context: DeployContext): void {
         workers: {
           rootDir: context.rootDir,
           workerCount: context.workerCount,
+          workerIds: context.workerIds,
+          serializedJsonBytes: context.workerManifestByteLength,
+          workerParameterKeys: Object.keys(context.workerParameterValues).sort(),
           events: context.workerEvents,
+        },
+        ecs: {
+          clusterArn: context.ecsClusterArn,
+          taskDefinitionArn: context.ecsTaskDefinitionArn,
+          taskExecutionRoleArn: context.ecsTaskExecutionRoleArn,
+          taskRoleArn: context.ecsTaskRoleArn,
+          securityGroupId: context.ecsSecurityGroupId,
+          subnetIdsCsv: context.ecsSubnetIdsCsv,
+        },
+        lambda: {
+          webhookSecretParameterName: context.webhookSecretParameterName,
+          artifactsBucketName: context.lambdaArtifactsBucketName,
         },
         template: parseUnknownJson(templateBody, "cloudformation template"),
       },
@@ -288,6 +402,51 @@ function printDryRun(templateBody: string, context: DeployContext): void {
       2,
     ),
   );
+}
+
+/**
+ * Build and upload Lambda artifact for deploy stack.
+ *
+ * @since 1.0.0
+ * @category AWS.Deploy
+ */
+async function buildAndUploadLambdaArtifact(context: DeployContext): Promise<LambdaArtifact> {
+  const tempDir = await mkdtemp(join(tmpdir(), "skipper-repo-forwarder-"));
+  const bundleFile = join(tempDir, "index.js");
+  const zipFile = join(tempDir, "lambda.zip");
+  try {
+    await buildLambdaBundle(bundleFile);
+    await Bun.$`zip -q -j ${zipFile} ${bundleFile}`;
+    const zipBytes = new Uint8Array(await Bun.file(zipFile).arrayBuffer());
+    const sha256 = createHash("sha256").update(zipBytes).digest("hex");
+    const key = `lambda/repository-forwarder/${sha256}.zip`;
+    const s3 = new S3Client({ region: context.region });
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: context.lambdaArtifactsBucketName,
+        Key: key,
+        Body: zipBytes,
+        ContentType: "application/zip",
+      }),
+    );
+    return {
+      bucket: context.lambdaArtifactsBucketName,
+      key,
+      sha256,
+    };
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Build EventBridge Lambda bundle to one file.
+ *
+ * @since 1.0.0
+ * @category AWS.Deploy
+ */
+async function buildLambdaBundle(outfile: string): Promise<void> {
+  await Bun.$`bun build ${EVENTBRIDGE_LAMBDA_ENTRY} --target=node --format=cjs --minify --outfile ${outfile}`;
 }
 
 /**
@@ -299,11 +458,12 @@ function printDryRun(templateBody: string, context: DeployContext): void {
 async function executeDeploy(templateBody: string, context: DeployContext): Promise<void> {
   try {
     const client = new CloudFormationClient({ region: context.region });
+    const artifact = await buildAndUploadLambdaArtifact(context);
     const result = await deployStack({
       client,
       stackName: context.stackName,
       templateBody,
-      parameters: createDeployTemplateParameters(context),
+      parameters: createDeployTemplateParameters(context, artifact),
       timeoutMinutes: context.timeoutMinutes,
       tags: context.tags,
     });
