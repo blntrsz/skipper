@@ -2,7 +2,6 @@
   "$schema": "https://json.schemastore.org/package.json",
   "name": "@skippercorp/skipper",
   "version": "1.0.0",
-  "module": "index.ts",
   "type": "module",
   "private": false,
   "publishConfig": {
