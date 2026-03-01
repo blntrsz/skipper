@@ -1,5 +1,11 @@
 # @skippercorp/skipper
 
+## 1.0.3
+
+### Patch Changes
+
+- a0476d9: add `--force` flag to `skipper rm` to remove dirty worktrees
+
 ## 1.0.2
 
 ### Patch Changes
