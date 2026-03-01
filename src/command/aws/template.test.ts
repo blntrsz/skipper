@@ -20,6 +20,9 @@ describe("buildTemplate", () => {
     expect(template.Parameters.EventDetailType).toBeDefined();
     expect(template.Parameters.WorkersSha256).toBeDefined();
     expect(template.Parameters.WorkersChunk00).toBeDefined();
+    expect(template.Parameters.GitHubAppId).toBeDefined();
+    expect(template.Parameters.GitHubAppPrivateKeySsmParameterName).toBeDefined();
+    expect(template.Parameters.GitHubAppPrivateKeySsmParameterName.AllowedPattern).toBe("^/.*");
 
     expect(template.Outputs.ApiInvokeUrl).toBeDefined();
     expect(template.Outputs.EventBusArn).toBeDefined();
@@ -34,6 +37,8 @@ describe("buildTemplate", () => {
     expect(template.Outputs.EcsSubnetIdsCsv).toBeDefined();
     expect(template.Outputs.WebhookSecretParameterName).toBeDefined();
     expect(template.Outputs.LambdaArtifactsBucketName).toBeDefined();
+    expect(template.Outputs.GitHubAppId).toBeDefined();
+    expect(template.Outputs.GitHubAppPrivateKeySsmParameterName).toBeDefined();
 
     expect(template.Resources.IngressQueue).toBeUndefined();
     expect(template.Resources.ForwarderLambdaFunction).toBeUndefined();
@@ -45,7 +50,9 @@ describe("buildTemplate", () => {
     const taskCommand =
       template.Resources.WebhookTaskDefinition.Properties.ContainerDefinitions[0].Command[2];
     expect(taskCommand).toContain("apt-get install -y curl git ca-certificates unzip nodejs gh");
-    expect(taskCommand).toContain('GH_TOKEN="${GH_TOKEN:-${GITHUB_TOKEN:-}}"');
+    expect(taskCommand).toContain('GITHUB_TOKEN="${GITHUB_TOKEN:?GITHUB_TOKEN required}"');
+    expect(taskCommand).toContain('GH_TOKEN="${GH_TOKEN:-${GITHUB_TOKEN}}"');
+    expect(taskCommand).toContain("x-access-token:${GITHUB_TOKEN}");
     expect(taskCommand).toContain("opencode run -m");
     expect(taskCommand).toContain("amazon-bedrock/");
 

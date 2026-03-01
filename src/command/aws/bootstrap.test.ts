@@ -1,5 +1,9 @@
 import { expect, test } from "bun:test";
-import { createTemplateParameters, resolveGithubEvents } from "./bootstrap.js";
+import {
+  assertAbsoluteSsmParameterName,
+  createTemplateParameters,
+  resolveGithubEvents,
+} from "./bootstrap.js";
 import { parseGithubEvents, parseTags, resolveDeployDefaults } from "./defaults.js";
 import { encodeWorkerManifest } from "../../worker/serialize.js";
 
@@ -51,6 +55,13 @@ test("resolveGithubEvents falls back to wildcard", () => {
   expect(resolveGithubEvents([], [])).toEqual(["*"]);
 });
 
+test("assertAbsoluteSsmParameterName requires absolute path", () => {
+  expect(() => assertAbsoluteSsmParameterName("/skipper/key")).not.toThrow();
+  expect(() => assertAbsoluteSsmParameterName("skipper/key")).toThrow(
+    "github app private key ssm parameter must start with /",
+  );
+});
+
 test("createTemplateParameters includes eventbridge params", () => {
   const encoded = encodeWorkerManifest({
     workers: [
@@ -72,6 +83,8 @@ test("createTemplateParameters includes eventbridge params", () => {
     githubRepo: "acme/repo",
     githubEvents: ["*"],
     webhookSecret: "secret",
+    githubAppId: "12345",
+    githubAppPrivateKeySsmParameterName: "/skipper/svc/sandbox/github-app-key",
     workerCount: encoded.workerCount,
     workerIds: ["review"],
     workerManifestByteLength: encoded.byteLength,
@@ -93,5 +106,9 @@ test("createTemplateParameters includes eventbridge params", () => {
   expect(parameters.EventSource).toBe("svc.webhook");
   expect(parameters.EventDetailType).toBe("WebhookReceived");
   expect(parameters.WebhookSecret).toBe("secret");
+  expect(parameters.GitHubAppId).toBe("12345");
+  expect(parameters.GitHubAppPrivateKeySsmParameterName).toBe(
+    "/skipper/svc/sandbox/github-app-key",
+  );
   expect(String(parameters.WorkersSha256).length).toBeGreaterThan(0);
 });

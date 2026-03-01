@@ -15,6 +15,9 @@ export type GitHubPayload = {
     full_name?: string;
     clone_url?: string;
   };
+  installation?: {
+    id?: number;
+  };
   issue?: {
     number?: number;
     html_url?: string;

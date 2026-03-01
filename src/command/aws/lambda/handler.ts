@@ -15,6 +15,7 @@ import {
   isGitHubPayload,
   isQueueEnvelope,
 } from "./types";
+import { mintInstallationToken } from "./github-app-runtime.js";
 
 type SQSEvent = {
   Records?: Array<{
@@ -83,7 +84,9 @@ async function handleRecord(body: string): Promise<void> {
     );
     return;
   }
-  for (const environment of environments) {
+  const installationId = readInstallationId(payload);
+  const githubToken = await mintInstallationToken(installationId);
+  for (const environment of injectGithubToken(environments, githubToken)) {
     await runTask(environment);
   }
 }
@@ -288,6 +291,20 @@ function inferEventFromPayload(payload: GitHubPayload): string {
 }
 
 /**
+ * Read required installation id from webhook payload.
+ *
+ * @since 1.0.0
+ * @category AWS.Lambda
+ */
+export function readInstallationId(payload: GitHubPayload): number {
+  const id = payload.installation?.id;
+  if (typeof id !== "number" || !Number.isInteger(id) || id <= 0) {
+    throw new Error("missing installation.id in github payload");
+  }
+  return id;
+}
+
+/**
  * Read normalized issue context from webhook payload.
  *
  * @since 1.0.0
@@ -351,7 +368,7 @@ async function verifyWebhookBody(rawBody: string, signature: string): Promise<vo
  * @since 1.0.0
  * @category AWS.Lambda
  */
-function buildTaskEnvironments(
+export function buildTaskEnvironments(
   payload: GitHubPayload,
   webhookMeta: WebhookMeta,
   manifest: WorkerManifest | undefined,
@@ -392,6 +409,23 @@ function buildTaskEnvironments(
 }
 
 /**
+ * Inject GitHub token into each ECS task environment.
+ *
+ * @since 1.0.0
+ * @category AWS.Lambda
+ */
+export function injectGithubToken(
+  environments: Array<Array<{ name: string; value: string }>>,
+  githubToken: string,
+): Array<Array<{ name: string; value: string }>> {
+  const token = githubToken.trim();
+  if (!token) {
+    throw new Error("missing github installation token");
+  }
+  return environments.map((environment) => upsertEnvironment(environment, "GITHUB_TOKEN", token));
+}
+
+/**
  * Filter matched workers when lambda is scoped to one worker id.
  *
  * @since 1.0.0
@@ -420,7 +454,6 @@ function buildLegacyTaskEnvironment(
   const prompt = resolvePrompt(payload);
   if (!prompt) throw new Error("missing prompt");
   const environment = [...baseEnvironment, { name: "PROMPT", value: prompt }];
-  pushOptionalEnv(environment, "GITHUB_TOKEN", process.env.GITHUB_TOKEN);
   pushOptionalEnv(environment, "ANTHROPIC_API_KEY", process.env.ANTHROPIC_API_KEY);
   return environment;
 }
@@ -451,9 +484,24 @@ function buildWorkerTaskEnvironment(
   for (const [key, value] of Object.entries(worker.runtime.env ?? {})) {
     environment.push({ name: key, value });
   }
-  pushOptionalEnv(environment, "GITHUB_TOKEN", process.env.GITHUB_TOKEN);
   pushOptionalEnv(environment, "ANTHROPIC_API_KEY", process.env.ANTHROPIC_API_KEY);
   return environment;
+}
+
+/**
+ * Upsert one env variable in ECS env list.
+ *
+ * @since 1.0.0
+ * @category AWS.Lambda
+ */
+function upsertEnvironment(
+  environment: Array<{ name: string; value: string }>,
+  name: string,
+  value: string,
+): Array<{ name: string; value: string }> {
+  const withoutExisting = environment.filter((entry) => entry.name !== name);
+  withoutExisting.push({ name, value });
+  return withoutExisting;
 }
 
 /**

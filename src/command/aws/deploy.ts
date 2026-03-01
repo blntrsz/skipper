@@ -66,8 +66,9 @@ type DeployContext = {
   ecsSecurityGroupId: string;
   ecsSubnetIdsCsv: string;
   webhookSecretParameterName: string;
+  githubAppId: string;
+  githubAppPrivateKeySsmParameterName: string;
   lambdaArtifactsBucketName: string;
-  githubToken?: string;
 };
 
 type LambdaArtifact = {
@@ -165,7 +166,6 @@ async function buildDeployContext(
     throw new Error("github repo not found from current repo; pass --github-repo");
   }
   const repositoryPrefix = toRepositoryPrefix(repositoryFullName);
-  const githubToken = await resolveOptionalGithubToken(rootDir);
   const stackName =
     options.stackName ?? buildRepoScopedStackName(repositoryPrefix, service, env);
   const bootstrapStackName =
@@ -205,8 +205,9 @@ async function buildDeployContext(
     ecsSecurityGroupId: shared.ecsSecurityGroupId,
     ecsSubnetIdsCsv: shared.ecsSubnetIdsCsv,
     webhookSecretParameterName: shared.webhookSecretParameterName,
+    githubAppId: shared.githubAppId,
+    githubAppPrivateKeySsmParameterName: shared.githubAppPrivateKeySsmParameterName,
     lambdaArtifactsBucketName: shared.lambdaArtifactsBucketName,
-    githubToken,
   };
 }
 
@@ -230,6 +231,8 @@ type SharedDeployConfig = {
   ecsSecurityGroupId: string;
   ecsSubnetIdsCsv: string;
   webhookSecretParameterName: string;
+  githubAppId: string;
+  githubAppPrivateKeySsmParameterName: string;
   lambdaArtifactsBucketName: string;
 };
 
@@ -281,6 +284,12 @@ async function resolveSharedDeployConfig(
     webhookSecretParameterName: readRequiredOutput(
       outputs,
       "WebhookSecretParameterName",
+      input.bootstrapStackName,
+    ),
+    githubAppId: readRequiredOutput(outputs, "GitHubAppId", input.bootstrapStackName),
+    githubAppPrivateKeySsmParameterName: readRequiredOutput(
+      outputs,
+      "GitHubAppPrivateKeySsmParameterName",
       input.bootstrapStackName,
     ),
     lambdaArtifactsBucketName: readRequiredOutput(
@@ -360,30 +369,12 @@ function createDeployTemplateParameters(
     EcsSecurityGroupId: context.ecsSecurityGroupId,
     EcsSubnetIdsCsv: context.ecsSubnetIdsCsv,
     WebhookSecretParameterName: context.webhookSecretParameterName,
-    GitHubToken: context.githubToken ?? "",
+    GitHubAppId: context.githubAppId,
+    GitHubAppPrivateKeySsmParameterName: context.githubAppPrivateKeySsmParameterName,
     LambdaCodeS3Bucket: artifact.bucket,
     LambdaCodeS3Key: artifact.key,
     ...context.workerParameterValues,
   };
-}
-
-/**
- * Resolve optional GitHub token from env or gh auth.
- *
- * @since 1.0.0
- * @category AWS.Deploy
- */
-async function resolveOptionalGithubToken(cwd: string): Promise<string | undefined> {
-  const tokenFromEnv = process.env.GITHUB_TOKEN?.trim() ?? process.env.GH_TOKEN?.trim() ?? "";
-  if (tokenFromEnv.length > 0) {
-    return tokenFromEnv;
-  }
-  const tokenFromGh = await Bun.$`gh auth token`.cwd(cwd).nothrow().text();
-  const normalized = tokenFromGh.trim();
-  if (normalized.length === 0) {
-    return undefined;
-  }
-  return normalized;
 }
 
 /**
@@ -428,6 +419,8 @@ function printDryRun(templateBody: string, context: DeployContext): void {
         },
         lambda: {
           webhookSecretParameterName: context.webhookSecretParameterName,
+          githubAppId: context.githubAppId,
+          githubAppPrivateKeySsmParameterName: context.githubAppPrivateKeySsmParameterName,
           artifactsBucketName: context.lambdaArtifactsBucketName,
         },
         template: parseUnknownJson(templateBody, "cloudformation template"),

@@ -17,7 +17,7 @@ const WEBHOOK_TASK_COMMAND = [
   "id -u runner >/dev/null 2>&1 || useradd -m -s /bin/bash runner",
   'runuser -u runner -- bash -lc "curl -fsSL https://bun.sh/install | bash"',
   'runuser -u runner -- env PATH="/home/runner/.bun/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" bash -lc "bun add -g @anthropic-ai/claude-code opencode-ai"',
-  'runuser -u runner -- env REPO_URL="$REPO_URL" PROMPT="$PROMPT" ECS_AGENT="${ECS_AGENT:-claude}" GITHUB_TOKEN="${GITHUB_TOKEN:-}" GH_TOKEN="${GH_TOKEN:-${GITHUB_TOKEN:-}}" ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}" ANTHROPIC_MODEL="${ANTHROPIC_MODEL:-}" OPENCODE_MODEL="${OPENCODE_MODEL:-amazon-bedrock/${ANTHROPIC_MODEL:-eu.anthropic.claude-sonnet-4-6}}" PATH="/home/runner/.bun/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" bash -lc \"if [ -n \\\"${GITHUB_TOKEN:-}\\\" ] && [ \\\"${REPO_URL#https://github.com/}\\\" != \\\"$REPO_URL\\\" ]; then REPO_URL=\\\"https://x-access-token:${GITHUB_TOKEN:-}@${REPO_URL#https://}\\\"; fi; rm -rf /home/runner/repo; git clone --depth 1 \\\"$REPO_URL\\\" /home/runner/repo; cd /home/runner/repo; if [ \\\"${ECS_AGENT}\\\" = \\\"opencode\\\" ]; then opencode run -m \\\"\\$OPENCODE_MODEL\\\" \\\"$PROMPT\\\"; else claude --dangerously-skip-permissions -p \\\"$PROMPT\\\"; fi\"',
+  'runuser -u runner -- env REPO_URL="$REPO_URL" PROMPT="$PROMPT" ECS_AGENT="${ECS_AGENT:-claude}" GITHUB_TOKEN="${GITHUB_TOKEN:?GITHUB_TOKEN required}" GH_TOKEN="${GH_TOKEN:-${GITHUB_TOKEN}}" ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}" ANTHROPIC_MODEL="${ANTHROPIC_MODEL:-}" OPENCODE_MODEL="${OPENCODE_MODEL:-amazon-bedrock/${ANTHROPIC_MODEL:-eu.anthropic.claude-sonnet-4-6}}" PATH="/home/runner/.bun/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" bash -lc \"if [ \\\"${REPO_URL#https://github.com/}\\\" != \\\"$REPO_URL\\\" ]; then REPO_URL=\\\"https://x-access-token:${GITHUB_TOKEN}@${REPO_URL#https://}\\\"; fi; rm -rf /home/runner/repo; git clone --depth 1 \\\"$REPO_URL\\\" /home/runner/repo; cd /home/runner/repo; if [ \\\"${ECS_AGENT}\\\" = \\\"opencode\\\" ]; then opencode run -m \\\"\\$OPENCODE_MODEL\\\" \\\"$PROMPT\\\"; else claude --dangerously-skip-permissions -p \\\"$PROMPT\\\"; fi\"',
 ].join("; ");
 
 const DEFAULT_BEDROCK_MODEL = "eu.anthropic.claude-sonnet-4-6";
@@ -72,6 +72,12 @@ function buildParameters(): JsonMap {
     EventSource: { Type: "String" },
     EventDetailType: { Type: "String" },
     WebhookSecret: { Type: "String", NoEcho: true },
+    GitHubAppId: { Type: "String" },
+    GitHubAppPrivateKeySsmParameterName: {
+      Type: "String",
+      AllowedPattern: "^/.*",
+      ConstraintDescription: "must start with /",
+    },
     ...buildWorkerParameters(),
   };
 }
@@ -125,6 +131,10 @@ function buildOutputs(): JsonMap {
     EcsSubnetIdsCsv: { Value: { "Fn::Join": [",", { Ref: "SubnetIds" }] } },
     WebhookSecretParameterName: { Value: { Ref: "WebhookSecretParameter" } },
     LambdaArtifactsBucketName: { Value: { Ref: "LambdaArtifactsBucket" } },
+    GitHubAppId: { Value: { Ref: "GitHubAppId" } },
+    GitHubAppPrivateKeySsmParameterName: {
+      Value: { Ref: "GitHubAppPrivateKeySsmParameterName" },
+    },
   };
 }
 

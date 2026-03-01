@@ -4,6 +4,12 @@ import {
   parseJson,
   readOptionalString,
 } from "../../shared/validation/parse-json.js";
+import { githubApiRequest } from "./github-app/api.js";
+import {
+  createInstallationAccessToken,
+  fetchRepositoryInstallationId,
+} from "./github-app/installations.js";
+import { buildGitHubAppJwt } from "./github-app/jwt.js";
 
 type GithubHook = {
   id?: number;
@@ -19,6 +25,8 @@ export type UpsertGithubWebhookInput = {
   webhookUrl: string;
   events?: string[];
   secret?: string;
+  githubAppId: string;
+  githubAppPrivateKeyPem: string;
 };
 
 export type UpsertGithubWebhookResult = {
@@ -82,20 +90,48 @@ export async function upsertGithubWebhook(
   const repo = normalizeRepo(input.repo);
   const webhookUrl = normalizeUrl(input.webhookUrl);
   const events = input.events && input.events.length > 0 ? input.events : ["*"];
+  const appJwt = buildGitHubAppJwt({
+    appId: input.githubAppId,
+    privateKeyPem: input.githubAppPrivateKeyPem,
+  });
+  const installationId = await fetchRepositoryInstallationId({
+    repo,
+    appJwt,
+  });
+  const installationToken = await createInstallationAccessToken({
+    installationId,
+    appJwt,
+  });
 
-  const hooksJson = await runGhApi([`repos/${repo}/hooks`]);
+  const hooksJson = await githubApiRequest({
+    path: `/repos/${repo}/hooks`,
+    token: installationToken.token,
+    tokenType: "token",
+  });
   const hooks = parseHooks(hooksJson);
   const existing = hooks.find(
     (hook) => normalizeUrl(hook.config?.url) === webhookUrl,
   );
 
+  const webhookBody = {
+    active: true,
+    events,
+    config: {
+      url: webhookUrl,
+      content_type: "json",
+      insecure_ssl: "0",
+      ...(input.secret && input.secret.length > 0 ? { secret: input.secret } : {}),
+    },
+  };
+
   if (existing?.id !== undefined) {
-    const updatedJson = await runGhApi([
-      "--method",
-      "PATCH",
-      `repos/${repo}/hooks/${existing.id}`,
-      ...buildWebhookFormArgs({ webhookUrl, events, secret: input.secret }),
-    ]);
+    const updatedJson = await githubApiRequest({
+      method: "PATCH",
+      path: `/repos/${repo}/hooks/${existing.id}`,
+      token: installationToken.token,
+      tokenType: "token",
+      body: webhookBody,
+    });
     const updated = parseHook(updatedJson);
     return {
       action: "updated",
@@ -103,83 +139,21 @@ export async function upsertGithubWebhook(
     };
   }
 
-  const createdJson = await runGhApi([
-    "--method",
-    "POST",
-    `repos/${repo}/hooks`,
-    "-f",
-    "name=web",
-    ...buildWebhookFormArgs({ webhookUrl, events, secret: input.secret }),
-  ]);
+  const createdJson = await githubApiRequest({
+    method: "POST",
+    path: `/repos/${repo}/hooks`,
+    token: installationToken.token,
+    tokenType: "token",
+    body: {
+      name: "web",
+      ...webhookBody,
+    },
+  });
   const created = parseHook(createdJson);
   return {
     action: "created",
     id: created.id,
   };
-}
-
-type WebhookFormArgsInput = {
-  webhookUrl: string;
-  events: string[];
-  secret?: string;
-};
-
-/**
- * Build `gh api` form args for webhook.
- *
- * @since 1.0.0
- * @category AWS.GitHub
- */
-function buildWebhookFormArgs(input: WebhookFormArgsInput): string[] {
-  const args = [
-    "-F",
-    "active=true",
-    "-f",
-    `config[url]=${input.webhookUrl}`,
-    "-f",
-    "config[content_type]=json",
-    "-f",
-    "config[insecure_ssl]=0",
-  ];
-
-  for (const event of input.events) {
-    args.push("-f", `events[]=${event}`);
-  }
-
-  if (input.secret && input.secret.length > 0) {
-    args.push("-f", `config[secret]=${input.secret}`);
-  }
-
-  return args;
-}
-
-/**
- * Execute `gh api` command.
- *
- * @since 1.0.0
- * @category AWS.GitHub
- */
-async function runGhApi(args: string[]): Promise<string> {
-  try {
-    const proc = Bun.spawn(["gh", "api", ...args], {
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-
-    const [stdout, stderr, code] = await Promise.all([
-      new Response(proc.stdout).text(),
-      new Response(proc.stderr).text(),
-      proc.exited,
-    ]);
-
-    if (code !== 0) {
-      throw new Error(stderr.trim() || `gh api failed (${code})`);
-    }
-    return stdout;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`GitHub API error: ${message}`);
-  }
 }
 
 /**
