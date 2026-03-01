@@ -4,6 +4,7 @@ export type QueueEnvelope = {
 };
 
 export type GitHubPayload = {
+  number?: number;
   prompt?: string;
   inputs?: {
     prompt?: string;
@@ -20,12 +21,16 @@ export type GitHubPayload = {
     html_url?: string;
   };
   pull_request?: {
+    number?: number;
+    html_url?: string;
     draft?: boolean;
     base?: {
       ref?: string;
+      sha?: string;
     };
     head?: {
       ref?: string;
+      sha?: string;
     };
   };
   action?: string;

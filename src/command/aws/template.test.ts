@@ -46,6 +46,8 @@ describe("buildTemplate", () => {
       template.Resources.WebhookTaskDefinition.Properties.ContainerDefinitions[0].Command[2];
     expect(taskCommand).toContain("apt-get install -y curl git ca-certificates unzip nodejs gh");
     expect(taskCommand).toContain('GH_TOKEN="${GH_TOKEN:-${GITHUB_TOKEN:-}}"');
+    expect(taskCommand).toContain('SKIPPER_WORKER_TYPE="${SKIPPER_WORKER_TYPE:-}"');
+    expect(taskCommand).toContain("bun ./src/worker/review/inline-runner.ts");
     expect(taskCommand).toContain("opencode run -m");
     expect(taskCommand).toContain("amazon-bedrock/");
 

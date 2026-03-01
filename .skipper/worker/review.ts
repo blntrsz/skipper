@@ -19,7 +19,7 @@ const reviewWorker = {
     mode: "comment-only",
     allowPush: false,
     prompt:
-      "Review this pull request and submit one consolidated review with all comments in a single batch. Only report major or minor issues (correctness, regressions, security, reliability, and meaningful test gaps). Ignore nitpicks or style-only feedback. Keep comments concise and actionable. Do not modify files, commit, or push.",
+      "Review this pull request and output JSON only. No markdown, no prose, no code fences. Return object: {\"version\":1,\"findings\":[...]} where each finding has: severity (major|minor), path, line, title, body. Report only major/minor issues (correctness, regressions, security, reliability, meaningful test gaps). Ignore style-only or nitpick feedback. Keep title/body concise and actionable. Use exact changed-line path+line from the PR diff only. Do not modify files, commit, push, or post comments yourself.",
   },
 } satisfies WorkerDefinition;
 
