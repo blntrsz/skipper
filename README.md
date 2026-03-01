@@ -15,6 +15,8 @@
   <span> | </span>
   <a href="#aws-worker-flow">AWS worker flow</a>
   <span> | </span>
+  <a href="docs/aws-github-app-auth.md">GitHub App auth</a>
+  <span> | </span>
   <a href="#development">Development</a>
 </p>
 
@@ -122,8 +124,13 @@ export default {
 ### 2) Bootstrap shared infrastructure (once per service/env)
 
 ```bash
-skipper aws bootstrap myservice sandbox --github-repo owner/repo
+skipper aws bootstrap myservice sandbox \
+  --github-repo owner/repo \
+  --github-app-id <app-id> \
+  --github-app-private-key-ssm-parameter </ssm/secure/string/name>
 ```
+
+GitHub auth is app-only (no PAT fallback). Set app private key in SSM SecureString first.
 
 ### 3) Deploy repo-scoped subscription stack
 

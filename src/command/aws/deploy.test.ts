@@ -41,7 +41,8 @@ test("buildDeployTemplate includes repository scoped event pattern", () => {
   expect(template.Parameters.EcsSecurityGroupId).toBeDefined();
   expect(template.Parameters.EcsSubnetIdsCsv).toBeDefined();
   expect(template.Parameters.WebhookSecretParameterName).toBeDefined();
-  expect(template.Parameters.GitHubToken).toBeDefined();
+  expect(template.Parameters.GitHubAppId).toBeDefined();
+  expect(template.Parameters.GitHubAppPrivateKeySsmParameterName).toBeDefined();
   expect(template.Parameters.LambdaCodeS3Bucket).toBeDefined();
   expect(template.Parameters.LambdaCodeS3Key).toBeDefined();
   expect(template.Parameters.WorkersSha256).toBeDefined();
@@ -63,7 +64,10 @@ test("buildDeployTemplate includes repository scoped event pattern", () => {
     expect(lambda.Properties.Environment.Variables.WEBHOOK_SECRET["Fn::Sub"]).toContain(
       "resolve:ssm:",
     );
-    expect(lambda.Properties.Environment.Variables.GITHUB_TOKEN.Ref).toBe("GitHubToken");
+    expect(lambda.Properties.Environment.Variables.GITHUB_APP_ID.Ref).toBe("GitHubAppId");
+    expect(
+      lambda.Properties.Environment.Variables.GITHUB_APP_PRIVATE_KEY_SSM_PARAMETER.Ref,
+    ).toBe("GitHubAppPrivateKeySsmParameterName");
 
     const expectedEvents = expectedEventsByWorker.get(workerId);
     expect(expectedEvents).toBeDefined();

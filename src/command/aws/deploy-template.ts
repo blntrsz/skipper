@@ -56,7 +56,8 @@ function buildParameters(): JsonMap {
     EcsTaskExecutionRoleArn: { Type: "String" },
     EcsTaskRoleArn: { Type: "String" },
     WebhookSecretParameterName: { Type: "String" },
-    GitHubToken: { Type: "String", Default: "", NoEcho: true },
+    GitHubAppId: { Type: "String" },
+    GitHubAppPrivateKeySsmParameterName: { Type: "String" },
     LambdaCodeS3Bucket: { Type: "String" },
     LambdaCodeS3Key: { Type: "String" },
     [WORKERS_ENCODING_PARAM]: { Type: "String", Default: "" },
@@ -144,6 +145,14 @@ function buildSharedResources(): JsonMap {
                       "arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${AWS::StackName}/*",
                   },
                 },
+                {
+                  Effect: "Allow",
+                  Action: ["ssm:GetParameter"],
+                  Resource: {
+                    "Fn::Sub":
+                      "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${GitHubAppPrivateKeySsmParameterName}",
+                  },
+                },
               ],
             },
           },
@@ -211,7 +220,10 @@ function buildWorkerResources(subscription: WorkerGithubEventSubscription): Json
               "Fn::Sub":
                 "{{resolve:ssm:${WebhookSecretParameterName}}}",
             },
-            GITHUB_TOKEN: { Ref: "GitHubToken" },
+            GITHUB_APP_ID: { Ref: "GitHubAppId" },
+            GITHUB_APP_PRIVATE_KEY_SSM_PARAMETER: {
+              Ref: "GitHubAppPrivateKeySsmParameterName",
+            },
             SKIPPER_WORKER_ID: subscription.workerId,
           },
         },

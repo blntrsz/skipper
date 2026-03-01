@@ -15,6 +15,7 @@ import {
   isGitHubPayload,
   isQueueEnvelope,
 } from "./types";
+import { mintInstallationToken } from "./github-app-runtime.js";
 
 type SQSEvent = {
   Records?: Array<{
@@ -75,8 +76,10 @@ async function handleRecord(body: string): Promise<void> {
     `Received webhook event=${webhookMeta.githubEvent} action=${payload.action ?? "none"} delivery=${webhookMeta.deliveryId} repo=${payload.repository?.full_name ?? "unknown"}`,
   );
   await verifyWebhookBody(rawBody, webhookMeta.signature);
+  const installationId = readInstallationId(payload);
+  const githubToken = await mintInstallationToken(installationId);
   const workers = await loadWorkersManifest();
-  const environments = buildTaskEnvironments(payload, webhookMeta, workers);
+  const environments = buildTaskEnvironments(payload, webhookMeta, workers, githubToken);
   if (environments.length === 0) {
     console.log(
       `No worker matched event=${webhookMeta.githubEvent} action=${payload.action ?? "none"}`,
@@ -288,6 +291,20 @@ function inferEventFromPayload(payload: GitHubPayload): string {
 }
 
 /**
+ * Read required installation id from webhook payload.
+ *
+ * @since 1.0.0
+ * @category AWS.Lambda
+ */
+export function readInstallationId(payload: GitHubPayload): number {
+  const id = payload.installation?.id;
+  if (typeof id !== "number" || !Number.isInteger(id) || id <= 0) {
+    throw new Error("missing installation.id in github payload");
+  }
+  return id;
+}
+
+/**
  * Read normalized issue context from webhook payload.
  *
  * @since 1.0.0
@@ -351,10 +368,11 @@ async function verifyWebhookBody(rawBody: string, signature: string): Promise<vo
  * @since 1.0.0
  * @category AWS.Lambda
  */
-function buildTaskEnvironments(
+export function buildTaskEnvironments(
   payload: GitHubPayload,
   webhookMeta: WebhookMeta,
   manifest: WorkerManifest | undefined,
+  githubToken: string,
 ): Array<Array<{ name: string; value: string }>> {
   const repositoryUrl = resolveRepositoryUrl(payload);
   if (!repositoryUrl) throw new Error("missing repository clone url");
@@ -374,7 +392,7 @@ function buildTaskEnvironments(
     if (workerIdFilter.length > 0) {
       throw new Error("worker-scoped lambda missing workers manifest");
     }
-    return [buildLegacyTaskEnvironment(payload, baseEnvironment)];
+    return [buildLegacyTaskEnvironment(payload, baseEnvironment, githubToken)];
   }
   const matchedWorkers = filterWorkersById(
     routeWorkers(manifest, {
@@ -388,7 +406,9 @@ function buildTaskEnvironments(
     }),
     workerIdFilter,
   );
-  return matchedWorkers.map((worker) => buildWorkerTaskEnvironment(baseEnvironment, worker));
+  return matchedWorkers.map((worker) =>
+    buildWorkerTaskEnvironment(baseEnvironment, worker, githubToken),
+  );
 }
 
 /**
@@ -416,11 +436,15 @@ function filterWorkersById(
 function buildLegacyTaskEnvironment(
   payload: GitHubPayload,
   baseEnvironment: Array<{ name: string; value: string }>,
+  githubToken: string,
 ): Array<{ name: string; value: string }> {
   const prompt = resolvePrompt(payload);
   if (!prompt) throw new Error("missing prompt");
-  const environment = [...baseEnvironment, { name: "PROMPT", value: prompt }];
-  pushOptionalEnv(environment, "GITHUB_TOKEN", process.env.GITHUB_TOKEN);
+  const environment = [
+    ...baseEnvironment,
+    { name: "PROMPT", value: prompt },
+    { name: "GITHUB_TOKEN", value: githubToken },
+  ];
   pushOptionalEnv(environment, "ANTHROPIC_API_KEY", process.env.ANTHROPIC_API_KEY);
   return environment;
 }
@@ -434,6 +458,7 @@ function buildLegacyTaskEnvironment(
 function buildWorkerTaskEnvironment(
   baseEnvironment: Array<{ name: string; value: string }>,
   worker: WorkerManifest["workers"][number],
+  githubToken: string,
 ): Array<{ name: string; value: string }> {
   const mode = worker.runtime.mode ?? "apply";
   const allowPush = worker.runtime.allowPush ?? mode !== "comment-only";
@@ -444,6 +469,7 @@ function buildWorkerTaskEnvironment(
     { name: "SKIPPER_WORKER_TYPE", value: worker.metadata.type },
     { name: "SKIPPER_WORKER_MODE", value: mode },
     { name: "SKIPPER_ALLOW_PUSH", value: allowPush ? "1" : "0" },
+    { name: "GITHUB_TOKEN", value: githubToken },
   ];
   if (worker.runtime.agent) {
     environment.push({ name: "ECS_AGENT", value: worker.runtime.agent });
@@ -451,7 +477,6 @@ function buildWorkerTaskEnvironment(
   for (const [key, value] of Object.entries(worker.runtime.env ?? {})) {
     environment.push({ name: key, value });
   }
-  pushOptionalEnv(environment, "GITHUB_TOKEN", process.env.GITHUB_TOKEN);
   pushOptionalEnv(environment, "ANTHROPIC_API_KEY", process.env.ANTHROPIC_API_KEY);
   return environment;
 }

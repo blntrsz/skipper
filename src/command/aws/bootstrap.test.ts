@@ -72,6 +72,8 @@ test("createTemplateParameters includes eventbridge params", () => {
     githubRepo: "acme/repo",
     githubEvents: ["*"],
     webhookSecret: "secret",
+    githubAppId: "12345",
+    githubAppPrivateKeySsmParameterName: "/skipper/svc/sandbox/github-app-key",
     workerCount: encoded.workerCount,
     workerIds: ["review"],
     workerManifestByteLength: encoded.byteLength,
@@ -93,5 +95,9 @@ test("createTemplateParameters includes eventbridge params", () => {
   expect(parameters.EventSource).toBe("svc.webhook");
   expect(parameters.EventDetailType).toBe("WebhookReceived");
   expect(parameters.WebhookSecret).toBe("secret");
+  expect(parameters.GitHubAppId).toBe("12345");
+  expect(parameters.GitHubAppPrivateKeySsmParameterName).toBe(
+    "/skipper/svc/sandbox/github-app-key",
+  );
   expect(String(parameters.WorkersSha256).length).toBeGreaterThan(0);
 });

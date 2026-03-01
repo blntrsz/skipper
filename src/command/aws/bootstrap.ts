@@ -1,5 +1,6 @@
 import { CloudFormationClient, type Output } from "@aws-sdk/client-cloudformation";
 import { EC2Client } from "@aws-sdk/client-ec2";
+import { GetParameterCommand, SSMClient } from "@aws-sdk/client-ssm";
 import { randomBytes } from "node:crypto";
 import type { Command } from "commander";
 import { parseUnknownJson } from "../../shared/validation/parse-json.js";
@@ -29,6 +30,8 @@ type BootstrapOptions = {
   githubRepo?: string;
   githubEvents?: string;
   githubSecret?: string;
+  githubAppId?: string;
+  githubAppPrivateKeySsmParameter?: string;
   skipGithubWebhook?: boolean;
   strictWorkers?: boolean;
   eventBusName?: string;
@@ -47,6 +50,8 @@ type BootstrapContext = {
   githubRepo?: string;
   githubEvents: string[];
   webhookSecret: string;
+  githubAppId: string;
+  githubAppPrivateKeySsmParameterName: string;
   workerCount: number;
   workerIds: string[];
   workerManifestByteLength: number;
@@ -120,6 +125,11 @@ function configureBootstrapCommand(command: Command): void {
     )
     .option("--github-events <events>", "Webhook events csv (default: *)")
     .option("--github-secret <secret>", "Webhook secret override")
+    .option("--github-app-id <id>", "GitHub App id")
+    .option(
+      "--github-app-private-key-ssm-parameter <name>",
+      "SSM SecureString parameter name for GitHub App private key",
+    )
     .option("--skip-github-webhook", "Skip GitHub webhook upsert")
     .option("--strict-workers", "Fail when no workers are found")
     .option("--dry-run-template", "Print template and parameters only")
@@ -180,6 +190,11 @@ async function buildBootstrapContext(
     workerEvents,
   );
   const webhookSecret = options.githubSecret ?? createWebhookSecret(service, env);
+  const githubAppId = requireValue(options.githubAppId?.trim(), "github app id");
+  const githubAppPrivateKeySsmParameterName = requireValue(
+    options.githubAppPrivateKeySsmParameter?.trim(),
+    "github app private key ssm parameter",
+  );
   validateInput(service, env);
   assertWebhookRepo(skipGithubWebhook, githubRepo);
   return {
@@ -193,6 +208,8 @@ async function buildBootstrapContext(
     githubRepo,
     githubEvents,
     webhookSecret,
+    githubAppId,
+    githubAppPrivateKeySsmParameterName,
     workerCount: encodedWorkers.workerCount,
     workerIds,
     workerManifestByteLength: encodedWorkers.byteLength,
@@ -231,6 +248,10 @@ function printDryRun(templateBody: string, context: BootstrapContext): void {
               events: context.githubEvents,
               secretConfigured: Boolean(context.webhookSecret),
             },
+        githubApp: {
+          id: context.githubAppId,
+          privateKeySsmParameter: context.githubAppPrivateKeySsmParameterName,
+        },
         workers: {
           rootDir: context.rootDir,
           workerCount: context.workerCount,
@@ -319,6 +340,8 @@ export function createTemplateParameters(
     EventSource: context.eventSource,
     EventDetailType: context.eventDetailType,
     WebhookSecret: context.webhookSecret,
+    GitHubAppId: context.githubAppId,
+    GitHubAppPrivateKeySsmParameterName: context.githubAppPrivateKeySsmParameterName,
     ...context.workerParameterValues,
   };
 }
@@ -355,14 +378,41 @@ async function upsertWebhookIfEnabled(
   if (context.skipGithubWebhook) return;
   const repo = requireValue(context.githubRepo, "github repo");
   const apiInvokeUrl = getRequiredOutput(outputs, "ApiInvokeUrl");
+  const githubAppPrivateKeyPem = await readRequiredSecureParameter(
+    context.region,
+    context.githubAppPrivateKeySsmParameterName,
+  );
   const hook = await upsertGithubWebhook({
     repo,
     webhookUrl: apiInvokeUrl,
     events: context.githubEvents,
     secret: context.webhookSecret,
+    githubAppId: context.githubAppId,
+    githubAppPrivateKeyPem,
   });
   console.log(`GitHub webhook ${hook.action}: ${repo} -> ${apiInvokeUrl}`);
   console.log("GitHub webhook secret rotated");
+}
+
+/**
+ * Read decrypted secure string from SSM.
+ *
+ * @since 1.0.0
+ * @category AWS.Bootstrap
+ */
+async function readRequiredSecureParameter(region: string, name: string): Promise<string> {
+  const client = new SSMClient({ region });
+  const response = await client.send(
+    new GetParameterCommand({
+      Name: name,
+      WithDecryption: true,
+    }),
+  );
+  const value = response.Parameter?.Value?.trim();
+  if (!value) {
+    throw new Error(`ssm parameter empty: ${name}`);
+  }
+  return value;
 }
 
 /**
