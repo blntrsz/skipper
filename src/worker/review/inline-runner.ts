@@ -16,10 +16,14 @@ import {
  * @since 1.0.0
  * @category Worker.Review
  */
-export async function main(): Promise<void> {
-  const context = readContextFromEnv(process.env);
+export async function main(input?: {
+  env?: NodeJS.ProcessEnv;
+  deps?: Partial<RunnerDeps>;
+}): Promise<void> {
+  const deps = buildRunnerDeps(input?.deps);
+  const context = readContextFromEnv(input?.env ?? process.env);
   const prompt = `${context.prompt}\n\n${buildInlineReviewContractPrompt()}`;
-  const rawOutput = await runAgent(prompt, context.agent, context.opencodeModel);
+  const rawOutput = await deps.runAgent(prompt, context.agent, context.opencodeModel);
 
   let findings: InlineReviewFinding[];
   try {
@@ -27,33 +31,65 @@ export async function main(): Promise<void> {
     const payload = parseInlineReviewPayload(jsonObject);
     findings = dedupeFindings(payload.findings);
   } catch (error) {
-    console.warn(`review output parse failed: ${toErrorMessage(error)}`);
-    return;
+    const message = `review output parse failed: ${toErrorMessage(error)}`;
+    deps.logWarn(message);
+    throw new Error(message);
   }
 
   if (findings.length === 0) {
-    console.log("no findings returned");
+    deps.logInfo("no findings returned");
     return;
   }
 
-  const pullFilesRaw = await Bun.$`gh api --paginate --slurp repos/${context.repo}/pulls/${context.prNumber}/files`.text();
+  const pullFilesRaw = await deps.fetchPullRequestFiles(context.repo, context.prNumber);
   const pullFiles = decodePullRequestFiles(pullFilesRaw);
   const changedLineIndex = buildChangedLineIndex(pullFiles);
   const { mapped, unmapped } = mapFindingsToChangedLines(findings, changedLineIndex);
 
   if (unmapped.length > 0) {
-    console.log(`skipped ${unmapped.length} unmappable findings`);
+    deps.logInfo(`skipped ${unmapped.length} unmappable findings`);
   }
   if (mapped.length === 0) {
-    console.log("no findings mapped to changed lines");
+    deps.logInfo("no findings mapped to changed lines");
     return;
   }
 
-  const headSha = await resolveHeadSha(context.repo, context.prNumber, context.prHeadSha);
+  const headSha = await deps.resolveHeadSha(context.repo, context.prNumber, context.prHeadSha);
   for (const finding of mapped) {
-    await postInlineComment(context.repo, context.prNumber, headSha, finding);
+    await deps.postInlineComment(context.repo, context.prNumber, headSha, finding);
   }
-  console.log(`posted ${mapped.length} inline comments`);
+  deps.logInfo(`posted ${mapped.length} inline comments`);
+}
+
+export type RunnerDeps = {
+  runAgent: typeof runAgent;
+  fetchPullRequestFiles: typeof fetchPullRequestFiles;
+  resolveHeadSha: typeof resolveHeadSha;
+  postInlineComment: typeof postInlineComment;
+  logInfo: (message: string) => void;
+  logWarn: (message: string) => void;
+};
+
+/**
+ * Build runtime dependencies for runner.
+ *
+ * @since 1.0.0
+ * @category Worker.Review
+ */
+function buildRunnerDeps(overrides: Partial<RunnerDeps> | undefined): RunnerDeps {
+  return {
+    runAgent,
+    fetchPullRequestFiles,
+    resolveHeadSha,
+    postInlineComment,
+    logInfo: (message) => {
+      console.log(message);
+    },
+    logWarn: (message) => {
+      console.warn(message);
+    },
+    ...(overrides ?? {}),
+  };
 }
 
 type RunnerContext = {
@@ -97,6 +133,16 @@ export async function runAgent(
     return Bun.$`opencode run -m ${opencodeModel} ${prompt}`.text();
   }
   return Bun.$`claude --dangerously-skip-permissions -p ${prompt}`.text();
+}
+
+/**
+ * Fetch changed files for pull request diff.
+ *
+ * @since 1.0.0
+ * @category Worker.Review
+ */
+export async function fetchPullRequestFiles(repo: string, prNumber: string): Promise<string> {
+  return Bun.$`gh api --paginate --slurp repos/${repo}/pulls/${prNumber}/files`.text();
 }
 
 /**

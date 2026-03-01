@@ -40,6 +40,40 @@ test("extractFirstJsonObject pulls JSON from mixed output", () => {
   expect(extractFirstJsonObject(raw)).toBe('{"version":1,"findings":[]}');
 });
 
+test("extractFirstJsonObject skips unrelated JSON objects", () => {
+  const raw =
+    '{"schema":"review"}\n{"version":1,"findings":[{"severity":"minor","path":"src/a.ts","line":2,"title":"t","body":"b"}]}';
+  expect(extractFirstJsonObject(raw)).toBe(
+    '{"version":1,"findings":[{"severity":"minor","path":"src/a.ts","line":2,"title":"t","body":"b"}]}',
+  );
+});
+
+test("parseInlineReviewPayload ignores invalid findings past max limit", () => {
+  const valid = Array.from({ length: 25 }, (_, index) => ({
+    severity: "minor",
+    path: "src/a.ts",
+    line: index + 1,
+    title: `t${index}`,
+    body: `b${index}`,
+  }));
+  const parsed = parseInlineReviewPayload(
+    JSON.stringify({
+      version: 1,
+      findings: [
+        ...valid,
+        {
+          severity: "major",
+          path: "",
+          line: -1,
+          title: "",
+          body: "",
+        },
+      ],
+    }),
+  );
+  expect(parsed.findings.length).toBe(25);
+});
+
 test("parseInlineReviewPayload rejects bad severity", () => {
   expect(() =>
     parseInlineReviewPayload(

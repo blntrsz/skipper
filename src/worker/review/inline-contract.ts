@@ -50,8 +50,8 @@ export function decodeInlineReviewPayload(value: unknown): InlineReviewPayload {
     throw new Error("review output findings must be array");
   }
   const findings = value.findings
-    .map((entry, index) => decodeInlineReviewFinding(entry, index))
-    .slice(0, MAX_INLINE_FINDINGS);
+    .slice(0, MAX_INLINE_FINDINGS)
+    .map((entry, index) => decodeInlineReviewFinding(entry, index));
   return {
     version: 1,
     findings,
@@ -84,14 +84,35 @@ export function buildInlineReviewContractPrompt(): string {
  * @category Worker.Review
  */
 export function extractFirstJsonObject(raw: string): string {
-  const start = raw.indexOf("{");
-  if (start === -1) {
+  const candidates = extractJsonObjectCandidates(raw);
+  if (candidates.length === 0) {
     throw new Error("review output missing JSON object");
   }
+  for (const candidate of candidates) {
+    const parsed = safeParseJson(candidate);
+    if (!parsed) {
+      continue;
+    }
+    if (isInlinePayloadCandidate(parsed)) {
+      return candidate;
+    }
+  }
+  throw new Error("review output missing payload JSON object");
+}
+
+/**
+ * Extract balanced JSON object candidates from text.
+ *
+ * @since 1.0.0
+ * @category Worker.Review
+ */
+function extractJsonObjectCandidates(raw: string): string[] {
+  const candidates: string[] = [];
   let depth = 0;
+  let start = -1;
   let inString = false;
   let escaped = false;
-  for (let index = start; index < raw.length; index += 1) {
+  for (let index = 0; index < raw.length; index += 1) {
     const char = raw[index];
     if (inString) {
       if (escaped) {
@@ -108,17 +129,54 @@ export function extractFirstJsonObject(raw: string): string {
       continue;
     }
     if (char === "{") {
+      if (depth === 0) {
+        start = index;
+      }
       depth += 1;
       continue;
     }
     if (char === "}") {
-      depth -= 1;
       if (depth === 0) {
-        return raw.slice(start, index + 1);
+        continue;
+      }
+      depth -= 1;
+      if (depth === 0 && start >= 0) {
+        candidates.push(raw.slice(start, index + 1));
+        start = -1;
       }
     }
   }
-  throw new Error("review output has unclosed JSON object");
+  if (depth !== 0) {
+    throw new Error("review output has unclosed JSON object");
+  }
+  return candidates;
+}
+
+/**
+ * Parse JSON safely.
+ *
+ * @since 1.0.0
+ * @category Worker.Review
+ */
+function safeParseJson(value: string): unknown | undefined {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Check minimal payload envelope shape.
+ *
+ * @since 1.0.0
+ * @category Worker.Review
+ */
+function isInlinePayloadCandidate(value: unknown): boolean {
+  if (!isRecord(value)) {
+    return false;
+  }
+  return value.version === 1 && Array.isArray(value.findings);
 }
 
 /**

@@ -1,17 +1,17 @@
-import { afterEach, expect, test } from "bun:test";
-import { buildTaskEnvironments } from "./handler.js";
+import { expect, test } from "bun:test";
 
-const originalPrompt = process.env.PROMPT;
+test("buildTaskEnvironments includes pull request context env vars", async () => {
+  process.env.ECS_CLUSTER_ARN = "arn:aws:ecs:us-east-1:123456789012:cluster/test";
+  process.env.ECS_TASK_DEFINITION_ARN = "arn:aws:ecs:us-east-1:123456789012:task-definition/test";
+  process.env.ECS_SECURITY_GROUP_ID = "sg-123456";
+  process.env.ECS_SUBNET_IDS = "subnet-1,subnet-2";
+  process.env.WEBHOOK_SECRET = "secret";
 
-afterEach(() => {
-  if (originalPrompt === undefined) {
-    delete process.env.PROMPT;
-    return;
-  }
-  process.env.PROMPT = originalPrompt;
-});
+  const modulePath = `./handler.js?test=${Date.now()}`;
+  const { buildTaskEnvironments } = (await import(modulePath)) as {
+    buildTaskEnvironments: typeof import("./handler.js").buildTaskEnvironments;
+  };
 
-test("buildTaskEnvironments includes pull request context env vars", () => {
   const environments = buildTaskEnvironments(
     {
       prompt: "test prompt",

@@ -22,12 +22,18 @@ type SQSEvent = {
   }>;
 };
 
+const clusterArn = requiredEnv("ECS_CLUSTER_ARN");
+const taskDefinitionArn = requiredEnv("ECS_TASK_DEFINITION_ARN");
+const securityGroupId = requiredEnv("ECS_SECURITY_GROUP_ID");
+const subnetIds = requiredEnv("ECS_SUBNET_IDS").split(",").map((v) => v.trim()).filter(Boolean);
+const webhookSecret = requiredEnv("WEBHOOK_SECRET");
 const assignPublicIp = process.env.ECS_ASSIGN_PUBLIC_IP === "DISABLED" ? "DISABLED" : "ENABLED";
 const containerName = process.env.ECS_CONTAINER_NAME ?? "webhook";
 const workersStackName = process.env.WORKERS_STACK_NAME?.trim() ?? "";
 const workersSha256 = process.env.WORKERS_SHA256?.trim() ?? "";
 const workerIdFilter = process.env.SKIPPER_WORKER_ID?.trim() ?? "";
 
+const webhooks = new Webhooks({ secret: webhookSecret });
 const ecs = new ECSClient({ region: process.env.AWS_REGION });
 const cloudformation = new CloudFormationClient({ region: process.env.AWS_REGION });
 
@@ -373,7 +379,6 @@ function readWebhookMeta(headers: Record<string, string | undefined>): WebhookMe
  * @category AWS.Lambda
  */
 async function verifyWebhookBody(rawBody: string, signature: string): Promise<void> {
-  const webhooks = new Webhooks({ secret: requiredEnv("WEBHOOK_SECRET") });
   const verified = await webhooks.verify(rawBody, signature);
   if (!verified) throw new Error("invalid webhook signature");
 }
@@ -519,10 +524,6 @@ function pushOptionalEnv(
  * @category AWS.Lambda
  */
 async function runTask(environment: Array<{ name: string; value: string }>): Promise<void> {
-  const clusterArn = requiredEnv("ECS_CLUSTER_ARN");
-  const taskDefinitionArn = requiredEnv("ECS_TASK_DEFINITION_ARN");
-  const securityGroupId = requiredEnv("ECS_SECURITY_GROUP_ID");
-  const subnetIds = requiredEnv("ECS_SUBNET_IDS").split(",").map((v) => v.trim()).filter(Boolean);
   const response = await ecs.send(
     new RunTaskCommand({
       cluster: clusterArn,
