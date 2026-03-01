@@ -76,17 +76,17 @@ async function handleRecord(body: string): Promise<void> {
     `Received webhook event=${webhookMeta.githubEvent} action=${payload.action ?? "none"} delivery=${webhookMeta.deliveryId} repo=${payload.repository?.full_name ?? "unknown"}`,
   );
   await verifyWebhookBody(rawBody, webhookMeta.signature);
-  const installationId = readInstallationId(payload);
-  const githubToken = await mintInstallationToken(installationId);
   const workers = await loadWorkersManifest();
-  const environments = buildTaskEnvironments(payload, webhookMeta, workers, githubToken);
+  const environments = buildTaskEnvironments(payload, webhookMeta, workers);
   if (environments.length === 0) {
     console.log(
       `No worker matched event=${webhookMeta.githubEvent} action=${payload.action ?? "none"}`,
     );
     return;
   }
-  for (const environment of environments) {
+  const installationId = readInstallationId(payload);
+  const githubToken = await mintInstallationToken(installationId);
+  for (const environment of injectGithubToken(environments, githubToken)) {
     await runTask(environment);
   }
 }
@@ -372,7 +372,6 @@ export function buildTaskEnvironments(
   payload: GitHubPayload,
   webhookMeta: WebhookMeta,
   manifest: WorkerManifest | undefined,
-  githubToken: string,
 ): Array<Array<{ name: string; value: string }>> {
   const repositoryUrl = resolveRepositoryUrl(payload);
   if (!repositoryUrl) throw new Error("missing repository clone url");
@@ -392,7 +391,7 @@ export function buildTaskEnvironments(
     if (workerIdFilter.length > 0) {
       throw new Error("worker-scoped lambda missing workers manifest");
     }
-    return [buildLegacyTaskEnvironment(payload, baseEnvironment, githubToken)];
+    return [buildLegacyTaskEnvironment(payload, baseEnvironment)];
   }
   const matchedWorkers = filterWorkersById(
     routeWorkers(manifest, {
@@ -406,9 +405,24 @@ export function buildTaskEnvironments(
     }),
     workerIdFilter,
   );
-  return matchedWorkers.map((worker) =>
-    buildWorkerTaskEnvironment(baseEnvironment, worker, githubToken),
-  );
+  return matchedWorkers.map((worker) => buildWorkerTaskEnvironment(baseEnvironment, worker));
+}
+
+/**
+ * Inject GitHub token into each ECS task environment.
+ *
+ * @since 1.0.0
+ * @category AWS.Lambda
+ */
+export function injectGithubToken(
+  environments: Array<Array<{ name: string; value: string }>>,
+  githubToken: string,
+): Array<Array<{ name: string; value: string }>> {
+  const token = githubToken.trim();
+  if (!token) {
+    throw new Error("missing github installation token");
+  }
+  return environments.map((environment) => upsertEnvironment(environment, "GITHUB_TOKEN", token));
 }
 
 /**
@@ -436,15 +450,10 @@ function filterWorkersById(
 function buildLegacyTaskEnvironment(
   payload: GitHubPayload,
   baseEnvironment: Array<{ name: string; value: string }>,
-  githubToken: string,
 ): Array<{ name: string; value: string }> {
   const prompt = resolvePrompt(payload);
   if (!prompt) throw new Error("missing prompt");
-  const environment = [
-    ...baseEnvironment,
-    { name: "PROMPT", value: prompt },
-    { name: "GITHUB_TOKEN", value: githubToken },
-  ];
+  const environment = [...baseEnvironment, { name: "PROMPT", value: prompt }];
   pushOptionalEnv(environment, "ANTHROPIC_API_KEY", process.env.ANTHROPIC_API_KEY);
   return environment;
 }
@@ -458,7 +467,6 @@ function buildLegacyTaskEnvironment(
 function buildWorkerTaskEnvironment(
   baseEnvironment: Array<{ name: string; value: string }>,
   worker: WorkerManifest["workers"][number],
-  githubToken: string,
 ): Array<{ name: string; value: string }> {
   const mode = worker.runtime.mode ?? "apply";
   const allowPush = worker.runtime.allowPush ?? mode !== "comment-only";
@@ -469,7 +477,6 @@ function buildWorkerTaskEnvironment(
     { name: "SKIPPER_WORKER_TYPE", value: worker.metadata.type },
     { name: "SKIPPER_WORKER_MODE", value: mode },
     { name: "SKIPPER_ALLOW_PUSH", value: allowPush ? "1" : "0" },
-    { name: "GITHUB_TOKEN", value: githubToken },
   ];
   if (worker.runtime.agent) {
     environment.push({ name: "ECS_AGENT", value: worker.runtime.agent });
@@ -479,6 +486,22 @@ function buildWorkerTaskEnvironment(
   }
   pushOptionalEnv(environment, "ANTHROPIC_API_KEY", process.env.ANTHROPIC_API_KEY);
   return environment;
+}
+
+/**
+ * Upsert one env variable in ECS env list.
+ *
+ * @since 1.0.0
+ * @category AWS.Lambda
+ */
+function upsertEnvironment(
+  environment: Array<{ name: string; value: string }>,
+  name: string,
+  value: string,
+): Array<{ name: string; value: string }> {
+  const withoutExisting = environment.filter((entry) => entry.name !== name);
+  withoutExisting.push({ name, value });
+  return withoutExisting;
 }
 
 /**

@@ -22,6 +22,7 @@ describe("buildTemplate", () => {
     expect(template.Parameters.WorkersChunk00).toBeDefined();
     expect(template.Parameters.GitHubAppId).toBeDefined();
     expect(template.Parameters.GitHubAppPrivateKeySsmParameterName).toBeDefined();
+    expect(template.Parameters.GitHubAppPrivateKeySsmParameterName.AllowedPattern).toBe("^/.*");
 
     expect(template.Outputs.ApiInvokeUrl).toBeDefined();
     expect(template.Outputs.EventBusArn).toBeDefined();

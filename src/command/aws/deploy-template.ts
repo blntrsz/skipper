@@ -57,7 +57,11 @@ function buildParameters(): JsonMap {
     EcsTaskRoleArn: { Type: "String" },
     WebhookSecretParameterName: { Type: "String" },
     GitHubAppId: { Type: "String" },
-    GitHubAppPrivateKeySsmParameterName: { Type: "String" },
+    GitHubAppPrivateKeySsmParameterName: {
+      Type: "String",
+      AllowedPattern: "^/.*",
+      ConstraintDescription: "must start with /",
+    },
     LambdaCodeS3Bucket: { Type: "String" },
     LambdaCodeS3Key: { Type: "String" },
     [WORKERS_ENCODING_PARAM]: { Type: "String", Default: "" },
@@ -151,6 +155,24 @@ function buildSharedResources(): JsonMap {
                   Resource: {
                     "Fn::Sub":
                       "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${GitHubAppPrivateKeySsmParameterName}",
+                  },
+                },
+                {
+                  Effect: "Allow",
+                  Action: ["kms:Decrypt"],
+                  Resource: "*",
+                  Condition: {
+                    StringEquals: {
+                      "kms:ViaService": {
+                        "Fn::Sub": "ssm.${AWS::Region}.amazonaws.com",
+                      },
+                    },
+                    StringLike: {
+                      "kms:EncryptionContext:PARAMETER_ARN": {
+                        "Fn::Sub":
+                          "arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${GitHubAppPrivateKeySsmParameterName}",
+                      },
+                    },
                   },
                 },
               ],

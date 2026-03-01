@@ -195,6 +195,7 @@ async function buildBootstrapContext(
     options.githubAppPrivateKeySsmParameter?.trim(),
     "github app private key ssm parameter",
   );
+  assertAbsoluteSsmParameterName(githubAppPrivateKeySsmParameterName);
   validateInput(service, env);
   assertWebhookRepo(skipGithubWebhook, githubRepo);
   return {
@@ -461,6 +462,18 @@ function validateInput(service: string, env: string): void {
   }
   if (!isSimpleName(env)) {
     throw new Error("env must match [a-zA-Z0-9-]+");
+  }
+}
+
+/**
+ * Validate SSM parameter name is absolute path.
+ *
+ * @since 1.0.0
+ * @category AWS.Bootstrap
+ */
+export function assertAbsoluteSsmParameterName(name: string): void {
+  if (!name.startsWith("/")) {
+    throw new Error("github app private key ssm parameter must start with /");
   }
 }
 

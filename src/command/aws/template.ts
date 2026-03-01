@@ -73,7 +73,11 @@ function buildParameters(): JsonMap {
     EventDetailType: { Type: "String" },
     WebhookSecret: { Type: "String", NoEcho: true },
     GitHubAppId: { Type: "String" },
-    GitHubAppPrivateKeySsmParameterName: { Type: "String" },
+    GitHubAppPrivateKeySsmParameterName: {
+      Type: "String",
+      AllowedPattern: "^/.*",
+      ConstraintDescription: "must start with /",
+    },
     ...buildWorkerParameters(),
   };
 }

@@ -1,5 +1,9 @@
 import { expect, test } from "bun:test";
-import { createTemplateParameters, resolveGithubEvents } from "./bootstrap.js";
+import {
+  assertAbsoluteSsmParameterName,
+  createTemplateParameters,
+  resolveGithubEvents,
+} from "./bootstrap.js";
 import { parseGithubEvents, parseTags, resolveDeployDefaults } from "./defaults.js";
 import { encodeWorkerManifest } from "../../worker/serialize.js";
 
@@ -49,6 +53,13 @@ test("resolveGithubEvents merges explicit and worker events", () => {
 
 test("resolveGithubEvents falls back to wildcard", () => {
   expect(resolveGithubEvents([], [])).toEqual(["*"]);
+});
+
+test("assertAbsoluteSsmParameterName requires absolute path", () => {
+  expect(() => assertAbsoluteSsmParameterName("/skipper/key")).not.toThrow();
+  expect(() => assertAbsoluteSsmParameterName("skipper/key")).toThrow(
+    "github app private key ssm parameter must start with /",
+  );
 });
 
 test("createTemplateParameters includes eventbridge params", () => {

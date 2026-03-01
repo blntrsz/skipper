@@ -16,7 +16,7 @@ test("readInstallationId reads webhook installation id", async () => {
   expect(() => readInstallationId({})).toThrow("missing installation.id in github payload");
 });
 
-test("buildTaskEnvironments injects github token", async () => {
+test("buildTaskEnvironments builds base env without token", async () => {
   const { buildTaskEnvironments } = await handlerModule;
   const environments = buildTaskEnvironments(
     {
@@ -32,10 +32,19 @@ test("buildTaskEnvironments injects github token", async () => {
       deliveryId: "delivery-1",
     },
     undefined,
-    "token-123",
   );
   expect(environments).toHaveLength(1);
   const first = environments[0] ?? [];
+  expect(first.some((entry) => entry.name === "GITHUB_TOKEN")).toBe(false);
+});
+
+test("injectGithubToken appends github token", async () => {
+  const { injectGithubToken } = await handlerModule;
+  const injected = injectGithubToken(
+    [[{ name: "PROMPT", value: "hello" }]],
+    "token-123",
+  );
+  const first = injected[0] ?? [];
   expect(first.find((entry) => entry.name === "GITHUB_TOKEN")?.value).toBe(
     "token-123",
   );
