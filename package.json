@@ -12,7 +12,7 @@
     "!src/**/*.test.ts"
   ],
   "bin": {
-    "skipper": "./src/index.ts"
+    "sk": "./src/index.ts"
   },
   "scripts": {
     "cli": "bun run ./src/index.ts",
