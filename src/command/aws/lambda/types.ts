@@ -15,6 +15,10 @@ export type GitHubPayload = {
     full_name?: string;
     clone_url?: string;
   };
+  issue?: {
+    number?: number;
+    html_url?: string;
+  };
   pull_request?: {
     draft?: boolean;
     base?: {

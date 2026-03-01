@@ -267,6 +267,11 @@ type WebhookMeta = {
   deliveryId: string;
 };
 
+type IssueContext = {
+  number: string;
+  url?: string;
+};
+
 /**
  * Infer GitHub event type from payload shape.
  *
@@ -275,9 +280,29 @@ type WebhookMeta = {
  */
 function inferEventFromPayload(payload: GitHubPayload): string {
   if (payload.pull_request) return "pull_request";
+  if (payload.issue) return "issues";
   const record = payload as Record<string, unknown>;
   if (typeof record.zen === "string") return "ping";
   return "unknown";
+}
+
+/**
+ * Read normalized issue context from webhook payload.
+ *
+ * @since 1.0.0
+ * @category AWS.Lambda
+ */
+function readIssueContext(payload: GitHubPayload): IssueContext | undefined {
+  if (!payload.issue) return undefined;
+  const issueNumber = payload.issue.number;
+  if (typeof issueNumber !== "number" || !Number.isInteger(issueNumber) || issueNumber <= 0) {
+    return undefined;
+  }
+  const issueUrl = payload.issue.html_url?.trim();
+  return {
+    number: String(issueNumber),
+    url: issueUrl && issueUrl.length > 0 ? issueUrl : undefined,
+  };
 }
 
 /**
@@ -339,6 +364,11 @@ function buildTaskEnvironments(
     { name: "GITHUB_ACTION", value: payload.action ?? "none" },
     { name: "REPOSITORY_URL", value: repositoryUrl },
   ];
+  const issueContext = readIssueContext(payload);
+  if (issueContext) {
+    baseEnvironment.push({ name: "GITHUB_ISSUE_NUMBER", value: issueContext.number });
+    pushOptionalEnv(baseEnvironment, "GITHUB_ISSUE_URL", issueContext.url);
+  }
   if (!manifest) {
     return [buildLegacyTaskEnvironment(payload, baseEnvironment)];
   }
