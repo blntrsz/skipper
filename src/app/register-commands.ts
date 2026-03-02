@@ -3,6 +3,7 @@ import { registerCloneCommand } from "../command/clone.js";
 import { registerAddCommand } from "../command/a.js";
 import { registerRemoveCommand } from "../command/rm.js";
 import { registerRunCommand } from "../command/run.js";
+import { registerUiCommand } from "../command/ui.js";
 import { registerAwsCommand } from "../command/aws/index.js";
 
 /**
@@ -17,6 +18,7 @@ export function registerCommands(program: Command): void {
   registerAddCommand(program);
   registerRemoveCommand(program);
   registerRunCommand(program);
+  registerUiCommand(program);
   registerAwsCommand(program);
 }
 
