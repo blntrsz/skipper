@@ -1,15 +1,14 @@
 import type { Command } from "commander";
 import {
   assertNonEmpty,
-  listDirectory,
   selectWithFzf,
 } from "../shared/command/interactive.js";
-
-type WorktreeRef = {
-  repo: string;
-  worktree: string;
-  path: string;
-};
+import {
+  collectWorktrees,
+  createSkipperPaths,
+  removeWorktree,
+  type WorktreeRef,
+} from "../worktree/service.js";
 
 type RemoveCommandOptions = {
   force?: boolean;
@@ -25,7 +24,10 @@ export function registerRemoveCommand(program: Command): void {
   program
     .command("rm")
     .description("Remove a worktree (repo+worktree)")
-    .option("-f, --force", "Force remove worktree with uncommitted changes")
+    .option(
+      "-f, --force",
+      "Force remove worktree with uncommitted changes (git worktree remove --force)",
+    )
     .action(runRemoveCommand);
 }
 
@@ -37,38 +39,15 @@ export function registerRemoveCommand(program: Command): void {
  */
 async function runRemoveCommand(options: RemoveCommandOptions = {}): Promise<void> {
   const force = options.force ?? true;
-  const worktreeBaseDir = `${process.env.HOME}/.local/share/skipper/worktree`;
-  const allWorktrees = await collectWorktrees(worktreeBaseDir);
+  const paths = createSkipperPaths();
+  const allWorktrees = await collectWorktrees(paths);
   assertNonEmpty(allWorktrees, "No worktrees found");
   const selected = await selectWorktree(allWorktrees);
   if (!selected) {
     console.log("No worktree selected");
     process.exit(0);
   }
-  await removeWorktree(selected, force);
-}
-
-/**
- * Collect all worktrees under base path.
- *
- * @since 1.0.0
- * @category Worktree
- */
-async function collectWorktrees(worktreeBaseDir: string): Promise<WorktreeRef[]> {
-  const repos = await listDirectory(worktreeBaseDir);
-  if (repos.length === 0) {
-    console.error("No worktrees found in ~/.local/share/skipper/worktree");
-    process.exit(1);
-  }
-  const allWorktrees: WorktreeRef[] = [];
-  for (const repo of repos) {
-    const repoDir = `${worktreeBaseDir}/${repo}`;
-    const worktrees = await listDirectory(repoDir);
-    for (const worktree of worktrees) {
-      allWorktrees.push({ repo, worktree, path: `${repoDir}/${worktree}` });
-    }
-  }
-  return allWorktrees;
+  await removeWorktree(paths, selected, force);
 }
 
 /**
@@ -86,48 +65,6 @@ async function selectWorktree(worktrees: WorktreeRef[]): Promise<WorktreeRef | u
 }
 
 /**
- * Remove worktree and tmux session.
- *
- * @since 1.0.0
- * @category Worktree
- */
-async function removeWorktree(target: WorktreeRef, force: boolean): Promise<void> {
-  const githubDir = `${process.env.HOME}/.local/share/github`;
-  const repoPath = `${githubDir}/${target.repo}`;
-  const sessionName = `${target.repo}-${target.worktree}`;
-  const name = `${target.repo}/${target.worktree}`;
-  console.log(`Removing worktree: ${name}`);
-  await removeGitWorktree(repoPath, target.path, force);
-  await Bun.$`rm -rf ${target.path}`;
-  if (await tmuxSessionExists(sessionName)) {
-    await Bun.$`tmux kill-session -t ${sessionName}`;
-    console.log(`Killed tmux session: ${sessionName}`);
-  }
-  console.log(`Removed worktree: ${name}`);
-}
-
-/**
- * Remove git worktree from repository.
- *
- * @since 1.0.0
- * @category Worktree
- */
-async function removeGitWorktree(
-  repoPath: string,
-  worktreePath: string,
-  force: boolean,
-): Promise<void> {
-  const result = force
-    ? await Bun.$`git -C ${repoPath} worktree remove --force ${worktreePath}`.nothrow()
-    : await Bun.$`git -C ${repoPath} worktree remove ${worktreePath}`.nothrow();
-  if (result.exitCode === 0) return;
-  const command = force ? "git worktree remove --force" : "git worktree remove";
-  throw new Error(
-    formatRemoveGitWorktreeError(result.stderr.toString(), result.exitCode, command),
-  );
-}
-
-/**
  * Build remove-git-worktree error message.
  *
  * @since 1.0.1
@@ -141,15 +78,4 @@ export function formatRemoveGitWorktreeError(
   const trimmed = stderr.trim();
   if (trimmed.length > 0) return trimmed;
   return `${command} failed with code ${exitCode}`;
-}
-
-/**
- * Check tmux session existence.
- *
- * @since 1.0.0
- * @category Worktree
- */
-async function tmuxSessionExists(sessionName: string): Promise<boolean> {
-  const output = await Bun.$`tmux has-session -t ${sessionName} 2>/dev/null && echo "yes" || echo "no"`.text();
-  return output.trim() === "yes";
 }

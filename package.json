@@ -41,6 +41,7 @@
     "@aws-sdk/client-sts": "^3.1000.0",
     "@octokit/webhooks": "^13.7.1",
     "@octokit/webhooks-types": "^7.6.1",
+    "@opentui/core": "^0.1.84",
     "@pulumi/aws": "^7.20.0",
     "@pulumi/pulumi": "^3.120.0",
     "commander": "^14.0.3"

@@ -83,9 +83,28 @@ Skipper manages:
 | `skipper a` | Selects repo/worktree with `fzf`, creates if missing, then attaches tmux |
 | `skipper rm [--force]` | Removes selected worktree and kills matching tmux session (`--force` discards local worktree changes) |
 | `skipper run "<prompt>"` | Selects repo, pulls latest, runs `opencode run` |
+| `skipper ui` | Opens a single worktree list with checkout/run/remove actions |
 | `skipper aws bootstrap ...` | Deploys shared AWS ingress stack + optional GitHub webhook |
 | `skipper aws deploy ...` | Deploys repository-scoped subscription stack |
 | `skipper aws run "<prompt>"` | Starts ECS task from bootstrap stack for prompt execution |
+
+### Local dashboard UI
+
+Open local dashboard:
+
+```bash
+skipper ui
+```
+
+Controls:
+
+- `Enter` checkout selected worktree
+- `p` run prompt in selected repo
+- `d` remove selected worktree (with confirmation)
+- `r` refresh state
+- `q` quit
+
+Note: `skipper ui` requires an interactive terminal (TTY).
 
 ## AWS worker flow
 

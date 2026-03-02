@@ -1,9 +1,9 @@
 import type { Command } from "commander";
 import {
   assertNonEmpty,
-  listDirectory,
   selectWithFzf,
 } from "../shared/command/interactive.js";
+import { createSkipperPaths, listRepos, runPromptInRepo } from "../worktree/service.js";
 
 /**
  * Register run command.
@@ -26,18 +26,14 @@ export function registerRunCommand(program: Command): void {
  * @category Worktree
  */
 async function runCommand(prompt: string): Promise<void> {
-  const baseDir = `${process.env.HOME}/.local/share/github`;
-  const repoList = await listDirectory(baseDir);
+  const paths = createSkipperPaths();
+  const repoList = await listRepos(paths);
   assertNonEmpty(repoList, "No repositories found in ~/.local/share/github");
   const repo = await selectWithFzf(repoList, "Select repository: ");
   if (!repo) {
     console.log("No repository selected");
     process.exit(0);
   }
-  const repoPath = `${baseDir}/${repo}`;
   console.log(`Selected: ${repo}`);
-  console.log("Pulling latest changes...");
-  await Bun.$`git -C ${repoPath} pull`;
-  console.log("Running opencode...");
-  await Bun.$`opencode run ${prompt}`.cwd(repoPath);
+  await runPromptInRepo(paths, repo, prompt);
 }
