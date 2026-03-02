@@ -1,5 +1,16 @@
 # @skippercorp/skipper
 
+## 1.1.0
+
+### Minor Changes
+
+- 8aedb35: Add a local `skipper ui` dashboard command to manage worktrees (checkout, run prompt, remove, refresh) from one TUI screen.
+  Refactor worktree lifecycle logic into a shared service used by `a`, `rm`, `run`, and the new UI command.
+
+### Patch Changes
+
+- 08f906b: force `sk rm` to remove dirty worktrees via `git worktree remove --force`
+
 ## 1.0.3
 
 ### Patch Changes
