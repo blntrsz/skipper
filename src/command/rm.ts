@@ -36,7 +36,7 @@ export function registerRemoveCommand(program: Command): void {
  * @category Worktree
  */
 async function runRemoveCommand(options: RemoveCommandOptions = {}): Promise<void> {
-  const force = options.force === true;
+  const force = options.force ?? true;
   const worktreeBaseDir = `${process.env.HOME}/.local/share/skipper/worktree`;
   const allWorktrees = await collectWorktrees(worktreeBaseDir);
   assertNonEmpty(allWorktrees, "No worktrees found");
@@ -121,10 +121,26 @@ async function removeGitWorktree(
     ? await Bun.$`git -C ${repoPath} worktree remove --force ${worktreePath}`.nothrow()
     : await Bun.$`git -C ${repoPath} worktree remove ${worktreePath}`.nothrow();
   if (result.exitCode === 0) return;
-  const stderr = result.stderr.toString().trim();
   const command = force ? "git worktree remove --force" : "git worktree remove";
-  const fallback = `${command} failed with code ${result.exitCode}`;
-  throw new Error(stderr || fallback);
+  throw new Error(
+    formatRemoveGitWorktreeError(result.stderr.toString(), result.exitCode, command),
+  );
+}
+
+/**
+ * Build remove-git-worktree error message.
+ *
+ * @since 1.0.1
+ * @category Worktree
+ */
+export function formatRemoveGitWorktreeError(
+  stderr: string,
+  exitCode: number,
+  command = "git worktree remove",
+): string {
+  const trimmed = stderr.trim();
+  if (trimmed.length > 0) return trimmed;
+  return `${command} failed with code ${exitCode}`;
 }
 
 /**
