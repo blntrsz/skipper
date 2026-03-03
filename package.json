@@ -39,11 +39,12 @@
     "@aws-sdk/client-ecs": "^3.1000.0",
     "@aws-sdk/client-s3": "^3.1000.0",
     "@aws-sdk/client-sts": "^3.1000.0",
+    "@effect/platform-bun": "4.0.0-beta.25",
+    "@ff-labs/bun": "^0.1.37",
     "@octokit/webhooks": "^13.7.1",
     "@octokit/webhooks-types": "^7.6.1",
     "@opentui/core": "^0.1.84",
-    "@pulumi/aws": "^7.20.0",
-    "@pulumi/pulumi": "^3.120.0",
-    "commander": "^14.0.3"
+    "commander": "^14.0.3",
+    "effect": "4.0.0-beta.25"
   }
 }
