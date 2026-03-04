@@ -6,3 +6,10 @@ export const GitRepository = Schema.Struct({
 });
 
 export type GitRepository = typeof GitRepository.Type;
+
+export const GitRepositoryOption = Schema.Struct({
+  repository: Schema.Option(Schema.String),
+  branch: Schema.Option(Schema.String),
+});
+
+export type GitRepositoryOption = typeof GitRepositoryOption.Type;

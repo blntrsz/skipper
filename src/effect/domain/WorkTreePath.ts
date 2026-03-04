@@ -7,8 +7,12 @@ export const WorkTreePath = Schema.String.pipe(Schema.brand("WorkTreePath"));
 
 export type WorkTreePath = typeof WorkTreePath.Type;
 
-export function make(git: GitRepository): WorkTreePath {
-  return WorkTreePath.makeUnsafe(
-    join(homedir(), ".local/share/skipper/worktree", git.repository, git.branch)
-  );
+const WORKTREE_ROOT = join(homedir(), ".local/share/skipper/worktree");
+
+export function make(repository: GitRepository["repository"]): WorkTreePath {
+  return WorkTreePath.makeUnsafe(join(WORKTREE_ROOT, repository));
+}
+
+export function root() {
+  return WORKTREE_ROOT;
 }

@@ -1,4 +1,4 @@
-import { Effect, Scope, ServiceMap } from "effect";
+import { Effect, ServiceMap } from "effect";
 import type { PlatformError } from "effect/PlatformError";
 import { ChildProcess } from "effect/unstable/process";
 import type { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
@@ -9,11 +9,11 @@ export const GitService = ServiceMap.Service<{
   createWorkTree: (
     repositoryPath: RepositoryPath,
     workTreePath: WorkTreePath
-  ) => Effect.Effect<void, PlatformError, ChildProcessSpawner | Scope.Scope>;
+  ) => Effect.Effect<void, PlatformError, ChildProcessSpawner>;
   removeWorkTree: (
     repositoryPath: RepositoryPath,
     workTreePath: WorkTreePath
-  ) => Effect.Effect<void, PlatformError, ChildProcessSpawner | Scope.Scope>;
+  ) => Effect.Effect<void, PlatformError, ChildProcessSpawner>;
 }>("GitService");
 
 export const GitServiceImpl = ServiceMap.make(GitService, {
@@ -21,30 +21,34 @@ export const GitServiceImpl = ServiceMap.make(GitService, {
     repositoryPath: RepositoryPath,
     workTreePath: WorkTreePath
   ) =>
-    Effect.gen(function* () {
-      yield* Effect.logInfo("Running git command");
+    Effect.scoped(
+      Effect.gen(function* () {
+        yield* Effect.logInfo("Running git command");
 
-      yield* Effect.logInfo(
-        `Creating git Worktree in ${repositoryPath} and ${workTreePath}`
-      );
+        yield* Effect.logInfo(
+          `Creating git Worktree in ${repositoryPath} and ${workTreePath}`
+        );
 
-      const handle = yield* ChildProcess.make({
-        cwd: repositoryPath,
-      })`git worktree add ${workTreePath}`;
+        const handle = yield* ChildProcess.make({
+          cwd: repositoryPath,
+        })`git worktree add ${workTreePath}`;
 
-      yield* handle.exitCode;
-    }),
+        yield* handle.exitCode;
+      })
+    ),
   removeWorkTree: (
     repositoryPath: RepositoryPath,
     workTreePath: WorkTreePath
   ) =>
-    Effect.gen(function* () {
-      yield* Effect.logInfo("Running git command");
+    Effect.scoped(
+      Effect.gen(function* () {
+        yield* Effect.logInfo("Running git command");
 
-      const handle = yield* ChildProcess.make({
-        cwd: repositoryPath,
-      })`git worktree remove ${workTreePath}`;
+        const handle = yield* ChildProcess.make({
+          cwd: repositoryPath,
+        })`git worktree remove ${workTreePath}`;
 
-      yield* handle.exitCode;
-    }),
+        yield* handle.exitCode;
+      })
+    ),
 });

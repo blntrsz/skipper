@@ -1,12 +1,12 @@
 import { Effect, FileSystem } from "effect";
-import { TmuxWorkTreeSandboxConfig } from "@/effect/domain/Sandbox";
 import * as WorkTreePath from "@/effect/domain/WorkTreePath";
 import * as RepositoryPath from "@/effect/domain/RepositoryPath";
 
 import { GitService, GitServiceImpl } from "@/effect/internal/GitService";
 import { TmuxService, TmuxServiceImpl } from "@/effect/internal/TmuxService";
+import type { GitRepository } from "@/effect/domain/Git";
 
-export const create = (config: TmuxWorkTreeSandboxConfig) =>
+export const create = (config: GitRepository) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const git = yield* GitService;
@@ -14,9 +14,9 @@ export const create = (config: TmuxWorkTreeSandboxConfig) =>
 
     yield* Effect.logInfo("Create tmux-worktree sandbox");
 
-    const repositoryPath = RepositoryPath.make(config.git);
-    const workTreePath = WorkTreePath.make(config.git);
-    const sessionName = `${config.git.repository}_${config.git.branch}`;
+    const repositoryPath = RepositoryPath.make(config);
+    const workTreePath = WorkTreePath.make(config.repository);
+    const sessionName = `${config.repository}-${config.branch}`;
 
     yield* Effect.logDebug("Resolved sandbox paths");
 
@@ -38,15 +38,15 @@ export const create = (config: TmuxWorkTreeSandboxConfig) =>
     yield* Effect.logInfo("Tmux session attach done");
   }).pipe(Effect.provide(GitServiceImpl), Effect.provide(TmuxServiceImpl));
 
-export const remove = (config: TmuxWorkTreeSandboxConfig) =>
+export const remove = (config: GitRepository) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const git = yield* GitService;
 
     yield* Effect.logInfo("Remove tmux-worktree sandbox");
 
-    const repositoryPath = RepositoryPath.make(config.git);
-    const workTreePath = WorkTreePath.make(config.git);
+    const repositoryPath = RepositoryPath.make(config);
+    const workTreePath = WorkTreePath.make(config.repository);
 
     const isWorkTreeExists = yield* fs.exists(workTreePath);
 
