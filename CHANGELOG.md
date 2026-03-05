@@ -1,5 +1,11 @@
 # @skippercorp/skipper
 
+## 1.2.0
+
+### Minor Changes
+
+- 777dfad: add effect
+
 ## 1.1.0
 
 ### Minor Changes
