@@ -12,14 +12,14 @@
     "!src/**/*.test.ts"
   ],
   "bin": {
-    "sk": "./src/Cli.ts"
+    "sk": "./bin/skipper"
   },
   "scripts": {
     "cli": "bun run ./src/Cli.ts",
     "typecheck": "bun x tsc --noEmit",
     "test": "bun test",
     "test:e2e:issue-subscription": "bun run ./scripts/verify-issue-subscription-e2e.ts",
-    "build": "bun build ./src/index.ts --compile --outfile bin/skipper",
+    "build": "bun build ./src/Cli.ts --compile --outfile bin/skipper",
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "changeset publish"
