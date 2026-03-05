@@ -1,5 +1,11 @@
 # @skippercorp/skipper
 
+## 1.2.2
+
+### Patch Changes
+
+- 58b0fcd: add build command
+
 ## 1.2.1
 
 ### Patch Changes
