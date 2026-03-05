@@ -1,5 +1,11 @@
 # @skippercorp/skipper
 
+## 1.2.3
+
+### Patch Changes
+
+- f7bf49f: fix tmux attach
+
 ## 1.2.2
 
 ### Patch Changes
