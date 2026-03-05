@@ -19,7 +19,7 @@
     "typecheck": "bun x tsc --noEmit",
     "test": "bun test",
     "test:e2e:issue-subscription": "bun run ./scripts/verify-issue-subscription-e2e.ts",
-    "build": "bun build ./src/Cli.ts --compile --outfile bin/skipper",
+    "build": "bun build ./src/Cli.ts --target bun-darwin-arm64 --compile --outfile bin/skipper",
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "changeset publish"
