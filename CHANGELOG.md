@@ -1,5 +1,11 @@
 # @skippercorp/skipper
 
+## 1.2.4
+
+### Patch Changes
+
+- 91f54fd: move to darwin arm 64
+
 ## 1.2.3
 
 ### Patch Changes
