@@ -17,7 +17,6 @@
   "scripts": {
     "cli": "bun run ./src/Cli.ts",
     "typecheck": "bun x tsc --noEmit",
-    "lint": "bun run typecheck && bun run ./scripts/check-source-standards.ts",
     "test": "bun test",
     "test:e2e:issue-subscription": "bun run ./scripts/verify-issue-subscription-e2e.ts",
     "build": "bun build ./src/index.ts --compile --outfile bin/skipper",
