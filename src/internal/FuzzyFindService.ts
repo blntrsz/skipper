@@ -6,6 +6,7 @@ const FZF_CANCELLED_EXIT_CODE = 130;
 
 type SearchInDirectoryOptions = {
   readonly throwOnNotFound?: boolean;
+  readonly additionalOptions?: readonly string[];
 };
 
 const resolveSelectionOrQuery = (output: string): string => {
@@ -13,14 +14,17 @@ const resolveSelectionOrQuery = (output: string): string => {
   return selection || query;
 };
 
-const searchWithFzf = async (directory: string): Promise<string> => {
+const searchWithFzf = async (
+  directory: string,
+  additionalOptions: readonly string[] = []
+): Promise<string> => {
   const entries = await Array.fromAsync(
     DIRECTORY_GLOB.scan({ cwd: directory, onlyFiles: false })
   );
-  const input = entries
+  const allOptions = [...additionalOptions, ...entries]
     .filter((entry) => entry.trim().length > 0)
-    .sort((a, b) => a.localeCompare(b))
-    .join("\n");
+    .sort((a, b) => a.localeCompare(b));
+  const input = allOptions.join("\n");
 
   const result = await Bun.$`echo ${input} | fzf --print-query`.nothrow();
 
@@ -46,12 +50,15 @@ export const FuzzyFindServiceImpl = ServiceMap.make(FuzzyFindService, {
   searchInDirectory: (directory, options) =>
     Effect.gen(function* () {
       const throwOnNotFound = options?.throwOnNotFound ?? false;
+      const additionalOptions = options?.additionalOptions ?? [];
 
       yield* Effect.logDebug("Starting fuzzy search").pipe(
-        Effect.annotateLogs({ directory, throwOnNotFound })
+        Effect.annotateLogs({ directory, throwOnNotFound, additionalOptions })
       );
 
-      const result = yield* Effect.promise(() => searchWithFzf(directory)).pipe(
+      const result = yield* Effect.promise(() =>
+        searchWithFzf(directory, additionalOptions)
+      ).pipe(
         Effect.tapError((error) =>
           Effect.logError("Fuzzy search failed", error).pipe(
             Effect.annotateLogs({ directory })

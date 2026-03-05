@@ -29,7 +29,9 @@ const resolveGitRepository = (git: GitRepositoryOption) =>
         });
     const branch = Option.isSome(git.branch)
       ? git.branch.value
-      : yield* fuzzy.searchInDirectory(WorkTreePath.make(repository));
+      : yield* fuzzy.searchInDirectory(WorkTreePath.make(repository), {
+          additionalOptions: ["main"],
+        });
 
     return GitRepository.makeUnsafe({
       repository,

@@ -20,6 +20,13 @@ export const create = (config: GitRepository) =>
 
     yield* Effect.logDebug("Resolved sandbox paths");
 
+    if (config.branch === "main") {
+      yield* Effect.logInfo("Using main branch, attaching to repository directly");
+      yield* tmux.attachSession(sessionName, repositoryPath);
+      yield* Effect.logInfo("Tmux session attach done");
+      return;
+    }
+
     const isWorkTreeExists = yield* fs.exists(workTreePath);
 
     if (!isWorkTreeExists) {
@@ -44,6 +51,11 @@ export const remove = (config: GitRepository) =>
     const git = yield* GitService;
 
     yield* Effect.logInfo("Remove tmux-worktree sandbox");
+
+    if (config.branch === "main") {
+      yield* Effect.logInfo("Main branch uses repository directly, nothing to remove");
+      return;
+    }
 
     const repositoryPath = RepositoryPath.make(config);
     const workTreePath = WorkTreePath.make(config.repository);

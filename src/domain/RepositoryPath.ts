@@ -15,6 +15,10 @@ export function make(git: GitRepository): RepositoryPath {
   return RepositoryPath.makeUnsafe(join(REPOSITORY_ROOT, git.repository));
 }
 
+export function makeFromRepository(repository: string): RepositoryPath {
+  return RepositoryPath.makeUnsafe(join(REPOSITORY_ROOT, repository));
+}
+
 export function root() {
   return REPOSITORY_ROOT;
 }
