@@ -11,11 +11,7 @@ export type RepositoryPath = typeof RepositoryPath.Type;
 
 const REPOSITORY_ROOT = join(homedir(), ".local/share/github");
 
-export function make(git: GitRepository): RepositoryPath {
-  return RepositoryPath.makeUnsafe(join(REPOSITORY_ROOT, git.repository));
-}
-
-export function makeFromRepository(repository: string): RepositoryPath {
+export function make(repository: GitRepository["repository"]): RepositoryPath {
   return RepositoryPath.makeUnsafe(join(REPOSITORY_ROOT, repository));
 }
 

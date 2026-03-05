@@ -9,8 +9,14 @@ export type WorkTreePath = typeof WorkTreePath.Type;
 
 const WORKTREE_ROOT = join(homedir(), ".local/share/skipper/worktree");
 
-export function make(repository: GitRepository["repository"]): WorkTreePath {
-  return WorkTreePath.makeUnsafe(join(WORKTREE_ROOT, repository));
+export function make(git: GitRepository): WorkTreePath {
+  return WorkTreePath.makeUnsafe(
+    join(WORKTREE_ROOT, git.repository, git.branch)
+  );
+}
+
+export function makeRepositoryPath(git: GitRepository): WorkTreePath {
+  return WorkTreePath.makeUnsafe(join(WORKTREE_ROOT, git.repository));
 }
 
 export function root() {
