@@ -71,11 +71,15 @@ const MOVE_DOWN = new Set(["down", "j"]);
 const MOVE_UP = new Set(["up", "k"]);
 const MAIN_TITLE = "Skipper Picker";
 
-const isDualPickerMoveDown = (key: { readonly name: string; readonly ctrl: boolean }) =>
-  key.name === "down" || (key.ctrl && key.name === "n");
+const isDualPickerMoveDown = (key: {
+  readonly name: string;
+  readonly ctrl: boolean;
+}) => key.name === "down" || (key.ctrl && key.name === "n");
 
-const isDualPickerMoveUp = (key: { readonly name: string; readonly ctrl: boolean }) =>
-  key.name === "up" || (key.ctrl && key.name === "p");
+const isDualPickerMoveUp = (key: {
+  readonly name: string;
+  readonly ctrl: boolean;
+}) => key.name === "up" || (key.ctrl && key.name === "p");
 
 const isPrintableCharacter = (value: string): boolean =>
   value.length === 1 && value >= " " && value !== "\u007f";
@@ -142,8 +146,10 @@ const renderSinglePicker = (
   }
 ) => {
   const visibleCount = Math.max(5, renderer.height - 8);
-  nodes.meta.content = "type search  enter confirm  esc cancel  j/k or arrows move";
-  nodes.query.content = state.query.length > 0 ? state.query : "(type to filter)";
+  nodes.meta.content =
+    "type search  enter confirm  esc cancel  j/k or arrows move";
+  nodes.query.content =
+    state.query.length > 0 ? state.query : "(type to filter)";
   nodes.listBox.title = `${title} (${state.filteredOptions.length})`;
   nodes.listText.content = toRows(
     state.filteredOptions,
@@ -177,13 +183,17 @@ const renderGitPicker = (
     state.worktreeQuery.length > 0
       ? state.worktreeQuery
       : "(type to search worktrees)";
-  nodes.repositoryBox.title = `Repositories${state.focusedPane === "repositories" ? " *" : ""} (${state.filteredRepositories.length})`;
+  nodes.repositoryBox.title = `Repositories${
+    state.focusedPane === "repositories" ? " *" : ""
+  } (${state.filteredRepositories.length})`;
   nodes.repositoryText.content = toRows(
     state.filteredRepositories,
     state.selectedRepository,
     visibleCount
   );
-  nodes.worktreeBox.title = `Worktrees${state.focusedPane === "worktrees" ? " *" : ""} (${state.filteredWorktrees.length})`;
+  nodes.worktreeBox.title = `Worktrees${
+    state.focusedPane === "worktrees" ? " *" : ""
+  } (${state.filteredWorktrees.length})`;
   nodes.worktreeText.content = toRows(
     state.filteredWorktrees,
     state.selectedWorktree,
@@ -194,7 +204,9 @@ const renderGitPicker = (
   nodes.repositoryBox.borderColor =
     state.focusedPane === "repositories" ? colors.activeBorder : colors.border;
   nodes.repositoryText.fg =
-    state.focusedPane === "repositories" ? colors.activeText : colors.foreground;
+    state.focusedPane === "repositories"
+      ? colors.activeText
+      : colors.foreground;
   nodes.worktreeBox.borderStyle =
     state.focusedPane === "worktrees" ? "double" : "single";
   nodes.worktreeBox.borderColor =
@@ -263,7 +275,9 @@ const createRepositorySearcher = async (
 
   return {
     search: (query, repositories) => {
-      const result = FileFinder.search(query, { pageSize: repositories.length || 100 });
+      const result = FileFinder.search(query, {
+        pageSize: repositories.length || 100,
+      });
 
       if (!result.ok) {
         return [];
@@ -458,8 +472,12 @@ const showRemoveWorktreeDialog = async (
         gap: 1,
         backgroundColor: colors.dialogBackground,
       });
-      const noButton = createButton(renderer, colors, "No", () => resolve(false));
-      const yesButton = createButton(renderer, colors, "Yes", () => resolve(true));
+      const noButton = createButton(renderer, colors, "No", () =>
+        resolve(false)
+      );
+      const yesButton = createButton(renderer, colors, "Yes", () =>
+        resolve(true)
+      );
       const rerenderButtons = () => {
         setButtonActive(noButton, selected === "no", colors);
         setButtonActive(yesButton, selected === "yes", colors);
@@ -721,21 +739,20 @@ export const pickGitRepository = async (
       };
 
       const rerender = () => {
-          renderGitPicker(state, renderer, colors, {
-            meta: layout.meta,
-            repositoryQuery,
-            worktreeQuery,
-            repositoryBox,
-            repositoryText,
-            worktreeBox,
-            worktreeText,
-          });
-          layout.meta.content =
-            !dialogState.active
-              ? "type search  tab switch pane  enter next/select  ctrl+a add worktree  ctrl+d remove worktree  esc cancel  ctrl+n/ctrl+p or arrows move"
-              : "dialog open";
-          renderer.requestRender();
-        };
+        renderGitPicker(state, renderer, colors, {
+          meta: layout.meta,
+          repositoryQuery,
+          worktreeQuery,
+          repositoryBox,
+          repositoryText,
+          worktreeBox,
+          worktreeText,
+        });
+        layout.meta.content = !dialogState.active
+          ? "type search  tab switch pane  enter next/select  ctrl+a add worktree  ctrl+d remove worktree  esc cancel  ctrl+n/ctrl+p or arrows move"
+          : "dialog open";
+        renderer.requestRender();
+      };
 
       renderer.keyInput.on("keypress", (key) => {
         if (dialogState.active || dialogs.manager.isOpen()) {
