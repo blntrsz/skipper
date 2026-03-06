@@ -28,11 +28,14 @@ const searchWithFzf = async (
 
   const result = await Bun.$`echo ${input} | fzf --print-query`.nothrow();
 
-  if (result.exitCode === 0 || result.exitCode === FZF_NO_MATCH_EXIT_CODE) {
+  if (result.exitCode === 0) {
     return resolveSelectionOrQuery(result.stdout.toString());
   }
 
-  if (result.exitCode === FZF_CANCELLED_EXIT_CODE) {
+  if (
+    result.exitCode === FZF_NO_MATCH_EXIT_CODE ||
+    result.exitCode === FZF_CANCELLED_EXIT_CODE
+  ) {
     return "";
   }
 
