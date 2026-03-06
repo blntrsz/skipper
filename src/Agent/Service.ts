@@ -111,10 +111,7 @@ export const AgentServiceImpl = ServiceMap.make(AgentService, {
         }
 
         const repository = yield* resolveRepositoryName(input.repository);
-        const repositoryPath = RepositoryPath.make({
-          repository,
-          branch: "main",
-        });
+        const repositoryPath = RepositoryPath.make(repository);
         const repositoryExists = yield* fs.exists(repositoryPath);
 
         if (!repositoryExists) {
