@@ -1,4 +1,4 @@
-import { Effect, Match, pipe, ServiceMap, Option } from "effect";
+import { Effect, FileSystem, Match, pipe, ServiceMap, Option } from "effect";
 import { SandboxService } from "./Port";
 import type { SandboxConfig } from "../domain/Sandbox";
 import * as TmuxWorktreeSandbox from "./adapter/TmuxWorkTreeService";
@@ -22,6 +22,7 @@ const notImplemented = (
 const resolveGitRepository = (git: GitRepositoryOption) =>
   Effect.gen(function* () {
     const fuzzy = yield* FuzzyFindService;
+    const fs = yield* FileSystem.FileSystem;
     const repository = Option.isSome(git.repository)
       ? git.repository.value
       : yield* fuzzy.searchInDirectory(RepositoryPath.root(), {
@@ -29,12 +30,24 @@ const resolveGitRepository = (git: GitRepositoryOption) =>
         });
     const branch = Option.isSome(git.branch)
       ? git.branch.value
-      : yield* fuzzy.searchInDirectory(
-          WorkTreePath.makeRepositoryPath({ repository, branch: "main" }),
-          {
-            additionalOptions: ["main"],
+      : yield* Effect.gen(function* () {
+          const workTreeRepositoryPath = WorkTreePath.makeRepositoryPath({
+            repository,
+            branch: "main",
+          });
+
+          const workTreeRepositoryExists = yield* fs.exists(
+            workTreeRepositoryPath
+          );
+
+          if (!workTreeRepositoryExists) {
+            return "main";
           }
-        );
+
+          return yield* fuzzy.searchInDirectory(workTreeRepositoryPath, {
+            additionalOptions: ["main"],
+          });
+        });
 
     return GitRepository.makeUnsafe({
       repository,

@@ -15,6 +15,7 @@ export const create = (config: GitRepository) =>
     yield* Effect.logInfo("Create tmux-worktree sandbox");
 
     const repositoryPath = RepositoryPath.make(config.repository);
+    const workTreeRepositoryPath = WorkTreePath.makeRepositoryPath(config);
     const workTreePath = WorkTreePath.make(config);
     const sessionName = `${config.repository}-${config.branch}`;
 
@@ -34,7 +35,7 @@ export const create = (config: GitRepository) =>
     if (!isWorkTreeExists) {
       yield* Effect.logInfo("Worktree missing, creating");
 
-      yield* fs.makeDirectory(repositoryPath, { recursive: true });
+      yield* fs.makeDirectory(workTreeRepositoryPath, { recursive: true });
       yield* git.createWorkTree(repositoryPath, workTreePath);
     } else {
       yield* Effect.logInfo("Worktree exists, reusing");
