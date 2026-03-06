@@ -14,13 +14,27 @@ const resolveSelectionOrQuery = (output: string): string => {
   return selection || query;
 };
 
+const scanDirectory = async (directory: string): Promise<string[]> => {
+  try {
+    return await Array.fromAsync(
+      DIRECTORY_GLOB.scan({ cwd: directory, onlyFiles: false })
+    );
+  } catch {
+    return [];
+  }
+};
+
+/**
+ * Run fzf against the merged list of directory entries and additional options.
+ *
+ * @since 1.2.4
+ * @category Shared
+ */
 const searchWithFzf = async (
   directory: string,
   additionalOptions: readonly string[] = []
 ): Promise<string> => {
-  const entries = await Array.fromAsync(
-    DIRECTORY_GLOB.scan({ cwd: directory, onlyFiles: false })
-  );
+  const entries = await scanDirectory(directory);
   const allOptions = [...additionalOptions, ...entries]
     .filter((entry) => entry.trim().length > 0)
     .sort((a, b) => a.localeCompare(b));
