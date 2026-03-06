@@ -1,5 +1,12 @@
 # @skippercorp/skipper
 
+## 1.2.5
+
+### Patch Changes
+
+- 311eaad: replace the old fzf flow with an OpenTUI repo/worktree picker, and split interactive picker use from direct worktree creation commands
+- f4471c1: fix repo path resolution for `sk run` and fail fast on invalid repository input
+
 ## 1.2.4
 
 ### Patch Changes
