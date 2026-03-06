@@ -13,6 +13,14 @@ export const SandboxService = ServiceMap.Service<{
     PlatformError.PlatformError | UnknownError,
     FileSystem.FileSystem | ChildProcessSpawner
   >;
+  picker: (
+    config: SandboxConfig,
+    git: GitRepositoryOption
+  ) => Effect.Effect<
+    void,
+    PlatformError.PlatformError | UnknownError,
+    FileSystem.FileSystem | ChildProcessSpawner
+  >;
   remove: (
     config: SandboxConfig,
     git: GitRepositoryOption

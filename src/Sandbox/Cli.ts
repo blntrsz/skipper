@@ -21,13 +21,17 @@ const flags = {
     repository: Flag.optional(
       Flag.string("repository").pipe(
         Flag.withAlias("username"),
-        Flag.withDescription("Git repository name (uses fzf when omitted)")
+        Flag.withDescription(
+          "Git repository name (uses interactive picker when omitted)"
+        )
       )
     ),
     branch: Flag.optional(
       Flag.string("branch").pipe(
         Flag.withAlias("branchname"),
-        Flag.withDescription("Git branch (uses fzf when omitted)")
+        Flag.withDescription(
+          "Git branch (uses interactive picker when omitted)"
+        )
       )
     ),
   },
@@ -56,7 +60,7 @@ export const cloneCommand = Command.make(
     )
 ).pipe(Command.withDescription("Clone repository into local repository root"));
 
-export const createCommand = Command.make("create", flags, (config) =>
+export const addCommand = Command.make("add", flags, (config) =>
   Effect.gen(function* () {
     const service = yield* SandboxService;
 
@@ -65,9 +69,20 @@ export const createCommand = Command.make("create", flags, (config) =>
       GitRepositoryOption.makeUnsafe(config.git)
     );
   }).pipe(Effect.provide(SandboxServiceImpl))
+).pipe(Command.withDescription("Create worktree"));
+
+export const pickerCommand = Command.make("picker", flags, (config) =>
+  Effect.gen(function* () {
+    const service = yield* SandboxService;
+
+    yield* service.picker(
+      SandboxConfig.makeUnsafe(config),
+      GitRepositoryOption.makeUnsafe(config.git)
+    );
+  }).pipe(Effect.provide(SandboxServiceImpl))
 ).pipe(
-  Command.withAlias("a"),
-  Command.withDescription("Create sandbox resources")
+  Command.withAlias("p"),
+  Command.withDescription("Open interactive repository/worktree picker")
 );
 
 export const removeCommand = Command.make("remove", flags, (config) =>

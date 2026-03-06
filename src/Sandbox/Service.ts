@@ -11,7 +11,7 @@ import { GitRepository, GitRepositoryOption } from "../domain/GitRepository";
 import * as RepositoryPath from "../domain/RepositoryPath";
 
 const notImplemented = (
-  action: "create" | "remove",
+  action: "create" | "remove" | "picker",
   type: SandboxConfig["type"]
 ) =>
   Effect.gen(function* () {
@@ -23,14 +23,29 @@ const resolveGitRepository = (git: GitRepositoryOption) =>
   Effect.gen(function* () {
     const fuzzy = yield* FuzzyFindService;
     const fs = yield* FileSystem.FileSystem;
+    const interactiveGitRepository =
+      Option.isNone(git.repository) && Option.isNone(git.branch)
+        ? yield* fuzzy.searchGitRepository()
+        : null;
+
+    if (
+      Option.isNone(git.repository) &&
+      Option.isNone(git.branch) &&
+      interactiveGitRepository === null
+    ) {
+      throw new Error("No repository/worktree selected");
+    }
+
     const repository = Option.isSome(git.repository)
       ? git.repository.value
-      : yield* fuzzy.searchInDirectory(RepositoryPath.root(), {
+      : interactiveGitRepository?.repository ??
+        (yield* fuzzy.searchInDirectory(RepositoryPath.root(), {
           throwOnNotFound: true,
-        });
+        }));
     const branch = Option.isSome(git.branch)
       ? git.branch.value
-      : yield* Effect.gen(function* () {
+      : interactiveGitRepository?.branch ??
+        (yield* Effect.gen(function* () {
           const workTreeRepositoryPath = WorkTreePath.makeRepositoryPath({
             repository,
             branch: "main",
@@ -46,8 +61,9 @@ const resolveGitRepository = (git: GitRepositoryOption) =>
 
           return yield* fuzzy.searchInDirectory(workTreeRepositoryPath, {
             additionalOptions: ["main"],
+            throwOnNotFound: true,
           });
-        });
+        }));
 
     return GitRepository.makeUnsafe({
       repository,
@@ -58,7 +74,16 @@ const resolveGitRepository = (git: GitRepositoryOption) =>
 export const SandboxServiceImpl = ServiceMap.make(SandboxService, {
   create: (config, git) =>
     Effect.gen(function* () {
-      yield* Effect.logInfo("Dispatch sandbox create");
+      yield* Effect.logInfo("Dispatch worktree create");
+      const gitRepository = yield* resolveGitRepository(git);
+
+      yield* TmuxWorktreeSandbox.create(gitRepository);
+
+      yield* Effect.logInfo("Worktree create finished");
+    }),
+  picker: (config, git) =>
+    Effect.gen(function* () {
+      yield* Effect.logInfo("Dispatch picker");
       const gitRepository = yield* resolveGitRepository(git);
 
       const matcher = pipe(
@@ -67,20 +92,20 @@ export const SandboxServiceImpl = ServiceMap.make(SandboxService, {
           TmuxWorktreeSandbox.create(gitRepository)
         ),
         Match.discriminator("type")("tmux-main", () =>
-          notImplemented("create", "tmux-main")
+          notImplemented("picker", "tmux-main")
         ),
         Match.discriminator("type")("docker", () =>
-          notImplemented("create", "docker")
+          notImplemented("picker", "docker")
         ),
         Match.discriminator("type")("ecs", () =>
-          notImplemented("create", "ecs")
+          notImplemented("picker", "ecs")
         ),
         Match.exhaustive
       );
 
       yield* matcher(config);
 
-      yield* Effect.logInfo("Sandbox create finished");
+      yield* Effect.logInfo("Picker finished");
     }),
   remove: (config, git) =>
     Effect.gen(function* () {

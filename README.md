@@ -26,8 +26,11 @@ bunx @skippercorp/skipper --help
 # Clone a repo
 skipper clone owner/repo
 
-# Create worktree + tmux session
-skipper a
+# Open interactive picker
+skipper p
+
+# Create worktree only
+skipper add
 
 # Run a prompt in a repo
 skipper run "fix typo in README"
@@ -41,7 +44,8 @@ skipper rm
 | Command | Description |
 |---------|-------------|
 | `skipper clone <owner/repo>` | Clone repo into `~/.local/share/github/<repo>` |
-| `skipper create` (or `a`) | Create worktree + tmux session (interactive) |
+| `skipper add` | Create worktree only |
+| `skipper picker` (or `p`) | Open interactive repo/worktree picker |
 | `skipper remove` (or `rm`) | Remove worktree + tmux session (interactive) |
 | `skipper run "<prompt>"` | Run prompt in selected repo |
 | `skipper task create` | Create a task |
@@ -55,7 +59,7 @@ skipper rm
 - `bun`
 - `git`
 - `gh` (GitHub CLI)
-- `fzf` (for interactive selection)
+- terminal with TTY support (for interactive picker)
 - `tmux`
 
 ## Development

@@ -2,7 +2,7 @@ import { Effect, Logger } from "effect";
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { CliError, Command } from "effect/unstable/cli";
 import packageJson from "../package.json";
-import { cloneCommand, createCommand, removeCommand } from "./Sandbox/Cli";
+import { addCommand, cloneCommand, pickerCommand, removeCommand } from "./Sandbox/Cli";
 import { TaskCli } from "./Task/Cli";
 import { runCommand } from "./Agent/Cli";
 
@@ -11,7 +11,8 @@ const argv = process.argv.slice(2).join(" ") || "<none>";
 const command = Command.make("skipper").pipe(
   Command.withSubcommands([
     cloneCommand,
-    createCommand,
+    addCommand,
+    pickerCommand,
     removeCommand,
     runCommand,
     TaskCli,

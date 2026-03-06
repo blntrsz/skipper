@@ -1,42 +1,14 @@
+import { rm } from "node:fs/promises";
 import { Effect, ServiceMap } from "effect";
-
-const DIRECTORY_GLOB = new Bun.Glob("*");
-const FZF_NO_MATCH_EXIT_CODE = 1;
-const FZF_CANCELLED_EXIT_CODE = 130;
+import type { GitRepository } from "@/domain/GitRepository";
+import * as RepositoryPath from "@/domain/RepositoryPath";
+import * as WorkTreePath from "@/domain/WorkTreePath";
+import { readGitPickerData, readPickerOptions } from "./picker/fs";
+import { pickGitRepository, pickSingleOption } from "./picker/OpenTuiPicker";
 
 type SearchInDirectoryOptions = {
   readonly throwOnNotFound?: boolean;
   readonly additionalOptions?: readonly string[];
-};
-
-const resolveSelectionOrQuery = (output: string): string => {
-  const [query = "", selection = ""] = output.trim().split("\n");
-  return selection || query;
-};
-
-const searchWithFzf = async (
-  directory: string,
-  additionalOptions: readonly string[] = []
-): Promise<string> => {
-  const entries = await Array.fromAsync(
-    DIRECTORY_GLOB.scan({ cwd: directory, onlyFiles: false })
-  );
-  const allOptions = [...additionalOptions, ...entries]
-    .filter((entry) => entry.trim().length > 0)
-    .sort((a, b) => a.localeCompare(b));
-  const input = allOptions.join("\n");
-
-  const result = await Bun.$`echo ${input} | fzf --print-query`.nothrow();
-
-  if (result.exitCode === 0 || result.exitCode === FZF_NO_MATCH_EXIT_CODE) {
-    return resolveSelectionOrQuery(result.stdout.toString());
-  }
-
-  if (result.exitCode === FZF_CANCELLED_EXIT_CODE) {
-    return "";
-  }
-
-  return "";
 };
 
 export const FuzzyFindService = ServiceMap.Service<{
@@ -44,6 +16,7 @@ export const FuzzyFindService = ServiceMap.Service<{
     directory: string,
     options?: SearchInDirectoryOptions
   ) => Effect.Effect<string, never, never>;
+  searchGitRepository: () => Effect.Effect<GitRepository | null, never, never>;
 }>("FuzzyFindService");
 
 export const FuzzyFindServiceImpl = ServiceMap.make(FuzzyFindService, {
@@ -57,10 +30,15 @@ export const FuzzyFindServiceImpl = ServiceMap.make(FuzzyFindService, {
       );
 
       const result = yield* Effect.promise(() =>
-        searchWithFzf(directory, additionalOptions)
+        readPickerOptions(directory, additionalOptions).then((entries) =>
+          pickSingleOption({
+            title: directory,
+            options: entries,
+          })
+        )
       ).pipe(
         Effect.tapError((error) =>
-          Effect.logError("Fuzzy search failed", error).pipe(
+          Effect.logError("Interactive picker failed", error).pipe(
             Effect.annotateLogs({ directory })
           )
         ),
@@ -78,6 +56,37 @@ export const FuzzyFindServiceImpl = ServiceMap.make(FuzzyFindService, {
       if (throwOnNotFound && result.length === 0) {
         throw new Error(`No fuzzy match found in '${directory}'`);
       }
+
+      return result;
+    }),
+  searchGitRepository: () =>
+    Effect.gen(function* () {
+      const result = yield* Effect.promise(() =>
+        readGitPickerData().then((data) =>
+          pickGitRepository(data, {
+            removeWorktree: async (gitRepository: GitRepository) => {
+              if (gitRepository.branch === "main") {
+                return;
+              }
+
+              const repositoryPath = RepositoryPath.make(
+                gitRepository.repository
+              );
+              const worktreePath = WorkTreePath.make(gitRepository);
+
+              await Bun.$`git -C ${repositoryPath} worktree remove --force ${worktreePath}`.nothrow();
+              await rm(worktreePath, { recursive: true, force: true });
+            },
+          })
+        )
+      ).pipe(
+        Effect.tapError((error) =>
+          Effect.logError("Git picker failed", error).pipe(
+            Effect.annotateLogs({ scope: "repository-worktree" })
+          )
+        ),
+        Effect.catch(() => Effect.succeed(null))
+      );
 
       return result;
     }),

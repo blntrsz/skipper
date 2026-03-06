@@ -10,7 +10,7 @@ export const runCommand = Command.make(
     ),
     repository: Flag.optional(
       Flag.string("repository").pipe(
-        Flag.withDescription("Repository name (uses fzf when omitted)")
+        Flag.withDescription("Repository name (uses interactive picker when omitted)")
       )
     ),
   },
