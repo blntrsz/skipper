@@ -1,5 +1,5 @@
-import { FileFinder } from "@ff-labs/bun";
 import { DialogContainerRenderable, DialogManager } from "@opentui-ui/dialog";
+import Fuse from "fuse.js";
 import {
   BoxRenderable,
   InputRenderable,
@@ -7,9 +7,6 @@ import {
   createCliRenderer,
   type CliRenderer,
 } from "@opentui/core";
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import type { GitRepository } from "@/domain/GitRepository";
 import type { GitPickerData } from "./fs";
 import {
@@ -216,14 +213,6 @@ const renderGitPicker = (
   renderer.requestRender();
 };
 
-const waitForScan = async () => {
-  const scanResult = FileFinder.waitForScan(100);
-
-  if (!scanResult.ok) {
-    throw new Error(scanResult.error);
-  }
-};
-
 const dedupeRankedResults = (
   options: readonly string[],
   ranked: readonly string[]
@@ -257,41 +246,22 @@ const createRepositorySearcher = async (
     };
   }
 
-  const tempDirectory = await mkdtemp(join(tmpdir(), "skipper-picker-"));
-  await Promise.all(
-    options.map((option) => Bun.write(join(tempDirectory, option), ""))
-  );
-
-  const initResult = FileFinder.init({
-    basePath: tempDirectory,
+  const finder = new Fuse(options, {
+    ignoreLocation: true,
+    includeScore: false,
+    minMatchCharLength: 1,
+    shouldSort: true,
+    threshold: 0.4,
   });
-
-  if (!initResult.ok) {
-    await rm(tempDirectory, { recursive: true, force: true });
-    throw new Error(initResult.error);
-  }
-
-  await waitForScan();
 
   return {
     search: (query, repositories) => {
-      const result = FileFinder.search(query, {
-        pageSize: repositories.length || 100,
-      });
-
-      if (!result.ok) {
-        return [];
-      }
-
       return dedupeRankedResults(
         repositories,
-        result.value.items.map((item) => item.relativePath)
+        finder.search(query).map(({ item }) => item)
       );
     },
-    destroy: async () => {
-      FileFinder.destroy();
-      await rm(tempDirectory, { recursive: true, force: true });
-    },
+    destroy: async () => undefined,
   };
 };
 

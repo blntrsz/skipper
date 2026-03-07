@@ -1,6 +1,6 @@
 ---
 name: ship
-description: Branch, commit, push & PR. Outline how to ship a change to production.
+description: Branch, commit, push & PR. Outline how to ship a change to production. Workflow can be triggered with the `ship it` command.
 ---
 
 ## Pre-commit
