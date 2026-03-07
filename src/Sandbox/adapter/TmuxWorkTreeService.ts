@@ -12,40 +12,24 @@ export const create = (config: GitRepository) =>
     const git = yield* GitService;
     const tmux = yield* TmuxService;
 
-    yield* Effect.logInfo("Create tmux-worktree sandbox");
-
     const repositoryPath = RepositoryPath.make(config.repository);
     const workTreeRepositoryPath = WorkTreePath.makeRepositoryPath(config);
     const workTreePath = WorkTreePath.make(config);
     const sessionName = `${config.repository}-${config.branch}`;
 
-    yield* Effect.logDebug("Resolved sandbox paths");
-
     if (config.branch === "main") {
-      yield* Effect.logInfo(
-        "Using main branch, attaching to repository directly"
-      );
       yield* tmux.attachSession(sessionName, repositoryPath);
-      yield* Effect.logInfo("Tmux session attach done");
       return;
     }
 
     const isWorkTreeExists = yield* fs.exists(workTreePath);
 
     if (!isWorkTreeExists) {
-      yield* Effect.logInfo("Worktree missing, creating");
-
       yield* fs.makeDirectory(workTreeRepositoryPath, { recursive: true });
       yield* git.createWorkTree(repositoryPath, workTreePath);
-    } else {
-      yield* Effect.logInfo("Worktree exists, reusing");
     }
 
-    yield* Effect.logInfo("Attaching tmux session");
-
     yield* tmux.attachSession(sessionName, workTreePath);
-
-    yield* Effect.logInfo("Tmux session attach done");
   }).pipe(Effect.provide(GitServiceImpl), Effect.provide(TmuxServiceImpl));
 
 export const remove = (config: GitRepository) =>
@@ -53,12 +37,7 @@ export const remove = (config: GitRepository) =>
     const fs = yield* FileSystem.FileSystem;
     const git = yield* GitService;
 
-    yield* Effect.logInfo("Remove tmux-worktree sandbox");
-
     if (config.branch === "main") {
-      yield* Effect.logInfo(
-        "Main branch uses repository directly, nothing to remove"
-      );
       return;
     }
 
@@ -68,13 +47,7 @@ export const remove = (config: GitRepository) =>
     const isWorkTreeExists = yield* fs.exists(workTreePath);
 
     if (isWorkTreeExists) {
-      yield* Effect.logInfo("Removing git worktree");
-
       yield* git.removeWorkTree(repositoryPath, workTreePath);
       yield* fs.remove(workTreePath, { recursive: true, force: true });
-
-      yield* Effect.logInfo("Removed tmux-worktree sandbox");
-    } else {
-      yield* Effect.logInfo("Worktree missing, nothing to remove");
     }
   }).pipe(Effect.provide(GitServiceImpl));

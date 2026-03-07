@@ -17,8 +17,6 @@ export const TmuxServiceImpl = ServiceMap.make(TmuxService, {
         const isInTmuxSession = !!process.env.TMUX;
         const tmuxOptions = { detached: false };
 
-        yield* Effect.logInfo("Running tmux command");
-
         const hasSessionHandle = yield* ChildProcess.make(
           tmuxOptions
         )`tmux has-session -t ${sessionName}`;
@@ -44,8 +42,6 @@ export const TmuxServiceImpl = ServiceMap.make(TmuxService, {
 
           return;
         }
-
-        yield* Effect.logInfo("Attaching to tmux session");
 
         const attachSessionHandle = yield* ChildProcess.make({
           cwd: path,

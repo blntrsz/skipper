@@ -58,7 +58,7 @@ export const cloneCommand = Command.make(
         yield* handle.exitCode;
       })
     )
-).pipe(Command.withDescription("Clone repository into local repository root"));
+).pipe(Command.withAlias("c"), Command.withDescription("Clone repository into local repository root"));
 
 export const addCommand = Command.make("add", flags, (config) =>
   Effect.gen(function* () {

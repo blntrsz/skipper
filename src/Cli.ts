@@ -6,27 +6,23 @@ import { addCommand, cloneCommand, pickerCommand, removeCommand } from "./Sandbo
 import { TaskCli } from "./Task/Cli";
 import { runCommand } from "./Agent/Cli";
 
-const argv = process.argv.slice(2).join(" ") || "<none>";
+const sandboxCommand = Command.make("sandbox").pipe(
+  Command.withAlias("s"),
+  Command.withDescription("Manage sandboxes"),
+  Command.withSubcommands([addCommand, removeCommand])
+);
 
 const command = Command.make("skipper").pipe(
   Command.withSubcommands([
     cloneCommand,
-    addCommand,
+    sandboxCommand,
     pickerCommand,
-    removeCommand,
     runCommand,
     TaskCli,
   ])
 );
 
 const cli = Effect.gen(function* () {
-  yield* Effect.logDebug("Starting effect CLI").pipe(
-    Effect.annotateLogs({
-      argv,
-      package: "src/effect",
-    })
-  );
-
   yield* Command.run(command, {
     version: packageJson.version,
   });

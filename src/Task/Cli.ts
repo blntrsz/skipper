@@ -113,6 +113,7 @@ const deleteCommand = Command.make("delete", { id: idFlag }, (input) =>
 ).pipe(Command.withDescription("Delete task"));
 
 export const TaskCli = Command.make("task").pipe(
+  Command.withAlias("t"),
   Command.withDescription("Manage tasks in sqlite db"),
   Command.withSubcommands([
     createCommand,

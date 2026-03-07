@@ -23,4 +23,4 @@ export const runCommand = Command.make(
         repository: input.repository,
       });
     }).pipe(Effect.provide(AgentServiceImpl))
-).pipe(Command.withDescription("Run configured command in a repository"));
+).pipe(Command.withAlias("r"), Command.withDescription("Run configured command in a repository"));

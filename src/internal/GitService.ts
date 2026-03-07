@@ -23,12 +23,6 @@ export const GitServiceImpl = ServiceMap.make(GitService, {
   ) =>
     Effect.scoped(
       Effect.gen(function* () {
-        yield* Effect.logInfo("Running git command");
-
-        yield* Effect.logInfo(
-          `Creating git Worktree in ${repositoryPath} and ${workTreePath}`
-        );
-
         const handle = yield* ChildProcess.make({
           cwd: repositoryPath,
         })`git worktree add ${workTreePath}`;
@@ -42,8 +36,6 @@ export const GitServiceImpl = ServiceMap.make(GitService, {
   ) =>
     Effect.scoped(
       Effect.gen(function* () {
-        yield* Effect.logInfo("Running git command");
-
         const handle = yield* ChildProcess.make({
           cwd: repositoryPath,
         })`git worktree remove ${workTreePath}`;

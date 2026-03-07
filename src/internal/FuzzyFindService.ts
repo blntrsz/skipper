@@ -25,10 +25,6 @@ export const FuzzyFindServiceImpl = ServiceMap.make(FuzzyFindService, {
       const throwOnNotFound = options?.throwOnNotFound ?? false;
       const additionalOptions = options?.additionalOptions ?? [];
 
-      yield* Effect.logDebug("Starting fuzzy search").pipe(
-        Effect.annotateLogs({ directory, throwOnNotFound, additionalOptions })
-      );
-
       const result = yield* Effect.promise(() =>
         readPickerOptions(directory, additionalOptions).then((entries) =>
           pickSingleOption({
@@ -43,14 +39,6 @@ export const FuzzyFindServiceImpl = ServiceMap.make(FuzzyFindService, {
           )
         ),
         Effect.catch(() => Effect.succeed(""))
-      );
-
-      yield* Effect.logDebug("Fuzzy search finished").pipe(
-        Effect.annotateLogs({
-          directory,
-          throwOnNotFound,
-          result: result.length > 0 ? result : "<empty>",
-        })
       );
 
       if (throwOnNotFound && result.length === 0) {

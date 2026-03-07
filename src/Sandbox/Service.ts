@@ -74,16 +74,14 @@ const resolveGitRepository = (git: GitRepositoryOption) =>
 export const SandboxServiceImpl = ServiceMap.make(SandboxService, {
   create: (config, git) =>
     Effect.gen(function* () {
-      yield* Effect.logInfo("Dispatch worktree create");
       const gitRepository = yield* resolveGitRepository(git);
 
       yield* TmuxWorktreeSandbox.create(gitRepository);
 
-      yield* Effect.logInfo("Worktree create finished");
+      yield* Effect.logInfo("Workflow created");
     }),
   picker: (config, git) =>
     Effect.gen(function* () {
-      yield* Effect.logInfo("Dispatch picker");
       const gitRepository = yield* resolveGitRepository(git);
 
       const matcher = pipe(
@@ -104,12 +102,9 @@ export const SandboxServiceImpl = ServiceMap.make(SandboxService, {
       );
 
       yield* matcher(config);
-
-      yield* Effect.logInfo("Picker finished");
     }),
   remove: (config, git) =>
     Effect.gen(function* () {
-      yield* Effect.logInfo("Dispatch sandbox remove");
       const gitRepository = yield* resolveGitRepository(git);
 
       const matcher = pipe(
@@ -131,6 +126,6 @@ export const SandboxServiceImpl = ServiceMap.make(SandboxService, {
 
       yield* matcher(config);
 
-      yield* Effect.logInfo("Sandbox remove finished");
+      yield* Effect.logInfo("Workflow removed");
     }),
 });
