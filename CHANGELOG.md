@@ -1,5 +1,11 @@
 # @skippercorp/skipper
 
+## 1.2.6
+
+### Patch Changes
+
+- 0370bcb: replace `@ff-labs/bun` with `fuse.js` in the picker so fuzzy matching stays in-memory and avoids the temp-dir scan setup
+
 ## 1.2.5
 
 ### Patch Changes
