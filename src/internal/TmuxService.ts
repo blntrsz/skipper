@@ -17,19 +17,19 @@ export const TmuxServiceImpl = ServiceMap.make(TmuxService, {
         const isInTmuxSession = !!process.env.TMUX;
         const tmuxOptions = { detached: false };
 
-        const hasSessionHandle = yield* ChildProcess.make(
-          tmuxOptions
-        )`tmux has-session -t ${sessionName}`;
-        const hasSessionExitCode = Number(yield* hasSessionHandle.exitCode);
-
-        if (hasSessionExitCode !== 0) {
-          const createSessionHandle = yield* ChildProcess.make(
-            tmuxOptions
-          )`tmux new-session -ds ${sessionName} -c ${path}`;
-          yield* createSessionHandle.exitCode;
-        }
-
         if (isInTmuxSession) {
+          const hasSessionHandle = yield* ChildProcess.make(
+            tmuxOptions
+          )`tmux has-session -t ${sessionName}`;
+          const hasSessionExitCode = Number(yield* hasSessionHandle.exitCode);
+
+          if (hasSessionExitCode !== 0) {
+            const createSessionHandle = yield* ChildProcess.make(
+              tmuxOptions
+            )`tmux new-session -ds ${sessionName} -c ${path}`;
+            yield* createSessionHandle.exitCode;
+          }
+
           const switchClientHandle = yield* ChildProcess.make(
             {
               ...tmuxOptions,
@@ -49,7 +49,7 @@ export const TmuxServiceImpl = ServiceMap.make(TmuxService, {
           stdin: "inherit",
           stdout: "inherit",
           stderr: "inherit",
-        })`tmux attach-session -t ${sessionName}`;
+        })`tmux new-session -As ${sessionName} -c ${path}`;
         yield* attachSessionHandle.exitCode;
       })
     ),
