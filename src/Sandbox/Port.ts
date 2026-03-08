@@ -4,7 +4,7 @@ import type { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSp
 import type { UnknownError } from "effect/Cause";
 import type { GitRepositoryOption } from "../domain/GitRepository";
 
-export const SandboxService = ServiceMap.Service<{
+export interface SandboxService {
   create: (
     config: SandboxConfig,
     git: GitRepositoryOption
@@ -29,4 +29,7 @@ export const SandboxService = ServiceMap.Service<{
     PlatformError.PlatformError | UnknownError,
     FileSystem.FileSystem | ChildProcessSpawner
   >;
-}>("SandboxService");
+}
+
+export const SandboxService =
+  ServiceMap.Service<SandboxService>("SandboxService");

@@ -1,30 +1,13 @@
-import { Effect, FileSystem, Option, PlatformError, ServiceMap } from "effect";
+import { Effect, FileSystem, ServiceMap } from "effect";
 import { ChildProcess } from "effect/unstable/process";
-import { createInterface } from "node:readline/promises";
-import type { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
 import { UnknownError } from "effect/Cause";
 import * as RepositoryPath from "../domain/RepositoryPath";
+import { AgentService } from "./Port";
 import {
-  FuzzyFindService,
-  FuzzyFindServiceImpl,
-} from "../internal/FuzzyFindService";
-import {
-  GLOBAL_CONFIG_PATH,
-  GlobalConfigService,
-  GlobalConfigServiceImpl,
-} from "../internal/GlobalConfigService";
-
-type AgentRunInput = {
-  readonly prompt: string;
-  readonly repository: Option.Option<string>;
-};
-
-const commandPrompt = "Command missing. Enter command: ";
-
-const isInteractive = () =>
-  process.stdin.isTTY === true &&
-  process.stdout.isTTY === true &&
-  process.env.CI === undefined;
+  AgentCommandService,
+  AgentCommandServiceImpl,
+} from "../internal/AgentCommandService";
+import { GitService, GitServiceImpl } from "../internal/GitService";
 
 const splitCommand = (command: string): ReadonlyArray<string> =>
   command
@@ -32,122 +15,57 @@ const splitCommand = (command: string): ReadonlyArray<string> =>
     .split(/\s+/)
     .filter((part) => part.length > 0);
 
-const resolveRepositoryName = (repository: Option.Option<string>) =>
-  Effect.gen(function* () {
-    if (Option.isSome(repository)) {
-      return repository.value;
-    }
+const run: AgentService["run"] = (input) =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const agentCommand = yield* AgentCommandService;
+      const git = yield* GitService;
+      const fs = yield* FileSystem.FileSystem;
+      const prompt = input.prompt.trim();
 
-    const fuzzy = yield* FuzzyFindService;
-    return yield* fuzzy.searchInDirectory(RepositoryPath.root(), {
-      throwOnNotFound: true,
-    });
-  });
+      if (prompt.length === 0) {
+        return yield* Effect.fail(
+          new UnknownError(undefined, "Prompt must not be empty")
+        );
+      }
 
-const promptForCommand = Effect.promise(async () => {
-  const rl = createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
+      const repository = yield* git.resolveRepositoryName(input.repository);
+      const repositoryPath = RepositoryPath.make(repository);
+      const repositoryExists = yield* fs.exists(repositoryPath);
 
-  try {
-    const answer = await rl.question(commandPrompt);
-    return answer.trim();
-  } finally {
-    rl.close();
-  }
-});
+      if (!repositoryExists) {
+        return yield* Effect.fail(
+          new UnknownError(
+            undefined,
+            `Repository '${repository}' not found in '${RepositoryPath.root()}'`
+          )
+        );
+      }
 
-const resolveCommand = Effect.gen(function* () {
-  const globalConfig = yield* GlobalConfigService;
-  const command = yield* globalConfig.getCommand();
+      const command = yield* agentCommand.resolveCommand();
+      const parts = splitCommand(command);
+      const executable = parts[0];
 
-  if (typeof command === "string" && command.trim().length > 0) {
-    return command.trim();
-  }
+      if (executable === undefined) {
+        return yield* Effect.fail(
+          new UnknownError(undefined, "Command must not be empty")
+        );
+      }
 
-  if (!isInteractive()) {
-    return yield* Effect.fail(
-      new UnknownError(
-        undefined,
-        `Missing command in ${GLOBAL_CONFIG_PATH}. Add { "command": "opencode run" }`
-      )
-    );
-  }
+      const handle = yield* ChildProcess.make(executable, [...parts.slice(1), prompt], {
+        cwd: repositoryPath,
+        stdin: "inherit",
+        stdout: "inherit",
+        stderr: "inherit",
+      });
 
-  const prompted = yield* promptForCommand;
-
-  if (prompted.length === 0) {
-    return yield* Effect.fail(
-      new UnknownError(undefined, "Command must not be empty")
-    );
-  }
-
-  yield* globalConfig.setCommand(prompted);
-  return prompted;
-});
-
-export const AgentService = ServiceMap.Service<{
-  run: (
-    input: AgentRunInput
-  ) => Effect.Effect<
-    void,
-    PlatformError.PlatformError | UnknownError,
-    FileSystem.FileSystem | ChildProcessSpawner
-  >;
-}>("AgentService");
+      yield* handle.exitCode;
+    })
+  ).pipe(
+    Effect.provide(GitServiceImpl),
+    Effect.provide(AgentCommandServiceImpl)
+  );
 
 export const AgentServiceImpl = ServiceMap.make(AgentService, {
-  run: (input) =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem;
-        const prompt = input.prompt.trim();
-
-        if (prompt.length === 0) {
-          return yield* Effect.fail(
-            new UnknownError(undefined, "Prompt must not be empty")
-          );
-        }
-
-        const repository = yield* resolveRepositoryName(input.repository);
-        const repositoryPath = RepositoryPath.make(repository);
-        const repositoryExists = yield* fs.exists(repositoryPath);
-
-        if (!repositoryExists) {
-          return yield* Effect.fail(
-            new UnknownError(
-              undefined,
-              `Repository '${repository}' not found in '${RepositoryPath.root()}'`
-            )
-          );
-        }
-
-        const command = yield* resolveCommand;
-        const parts = splitCommand(command);
-        const executable = parts[0];
-
-        if (executable === undefined) {
-          return yield* Effect.fail(
-            new UnknownError(undefined, "Command must not be empty")
-          );
-        }
-
-        const handle = yield* ChildProcess.make(
-          executable,
-          [...parts.slice(1), prompt],
-          {
-            cwd: repositoryPath,
-            stdin: "inherit",
-            stdout: "inherit",
-            stderr: "inherit",
-          }
-        );
-
-        yield* handle.exitCode;
-      })
-    ).pipe(
-      Effect.provide(FuzzyFindServiceImpl),
-      Effect.provide(GlobalConfigServiceImpl)
-    ),
+  run,
 });

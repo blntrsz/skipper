@@ -2,7 +2,8 @@ import { Effect } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
 import * as Task from "../domain/Task";
 import { DatabaseLive, runMigrations } from "../internal/DatabaseService";
-import { TaskService, TaskServiceImpl } from "./Service";
+import { TaskService } from "./Port";
+import { TaskServiceImpl } from "./Service";
 
 const taskStateChoices = [
   "stale",

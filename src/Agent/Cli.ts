@@ -1,6 +1,7 @@
 import { Effect } from "effect";
 import { Argument, Command, Flag } from "effect/unstable/cli";
-import { AgentService, AgentServiceImpl } from "./Service";
+import { AgentService } from "./Port";
+import { AgentServiceImpl } from "./Service";
 
 export const runCommand = Command.make(
   "run",

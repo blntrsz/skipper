@@ -1,3 +1,4 @@
 import { ServiceMap } from "effect";
+import { WorkerService } from "./Port";
 
-export const WorkerService = ServiceMap.Service<{}>("WorkerService");
+export const WorkerServiceImpl = ServiceMap.make(WorkerService, {});

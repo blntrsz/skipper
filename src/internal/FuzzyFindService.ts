@@ -1,8 +1,7 @@
-import { rm } from "node:fs/promises";
 import { Effect, ServiceMap } from "effect";
+import { BunServices } from "@effect/platform-bun";
 import type { GitRepository } from "@/domain/GitRepository";
-import * as RepositoryPath from "@/domain/RepositoryPath";
-import * as WorkTreePath from "@/domain/WorkTreePath";
+import * as WorkTreeService from "@/Sandbox/adapter/WorkTreeService";
 import { readGitPickerData, readPickerOptions } from "./picker/fs";
 import { pickGitRepository, pickSingleOption } from "./picker/OpenTuiPicker";
 
@@ -53,17 +52,11 @@ export const FuzzyFindServiceImpl = ServiceMap.make(FuzzyFindService, {
         readGitPickerData().then((data) =>
           pickGitRepository(data, {
             removeWorktree: async (gitRepository: GitRepository) => {
-              if (gitRepository.branch === "main") {
-                return;
-              }
-
-              const repositoryPath = RepositoryPath.make(
-                gitRepository.repository
+              await Effect.runPromise(
+                WorkTreeService.remove(gitRepository).pipe(
+                  Effect.provide(BunServices.layer)
+                )
               );
-              const worktreePath = WorkTreePath.make(gitRepository);
-
-              await Bun.$`git -C ${repositoryPath} worktree remove --force ${worktreePath}`.nothrow();
-              await rm(worktreePath, { recursive: true, force: true });
             },
           })
         )

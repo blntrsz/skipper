@@ -1,14 +1,9 @@
-import { Effect, FileSystem, Match, pipe, ServiceMap, Option } from "effect";
+import { Effect, Match, pipe, ServiceMap } from "effect";
 import { SandboxService } from "./Port";
 import type { SandboxConfig } from "../domain/Sandbox";
-import * as TmuxWorktreeSandbox from "./adapter/TmuxWorkTreeService";
-import {
-  FuzzyFindService,
-  FuzzyFindServiceImpl,
-} from "../internal/FuzzyFindService";
-import * as WorkTreePath from "../domain/WorkTreePath";
-import { GitRepository, GitRepositoryOption } from "../domain/GitRepository";
-import * as RepositoryPath from "../domain/RepositoryPath";
+import * as TmuxSandbox from "./adapter/TmuxSandboxService";
+import * as WorkTreeSandbox from "./adapter/WorkTreeService";
+import { GitService, GitServiceImpl } from "../internal/GitService";
 
 const notImplemented = (
   action: "create" | "remove" | "picker",
@@ -19,113 +14,111 @@ const notImplemented = (
     yield* Effect.die(`Sandbox backend '${type}'.'${action}' not implemented`);
   });
 
-const resolveGitRepository = (git: GitRepositoryOption) =>
+/**
+ * Creates a sandbox environment based on the provided configuration and Git repository information.
+ * Delegates to specific sandbox implementations (e.g., tmux-worktree) based on the 'type' field in the configuration.
+ *
+ * @since 1.0.0
+ * @category ServiceMethod
+ */
+const create: SandboxService["create"] = (config, git) =>
   Effect.gen(function* () {
-    const fuzzy = yield* FuzzyFindService;
-    const fs = yield* FileSystem.FileSystem;
-    const interactiveGitRepository =
-      Option.isNone(git.repository) && Option.isNone(git.branch)
-        ? yield* fuzzy.searchGitRepository()
-        : null;
+    const gitService = yield* GitService;
+    const gitRepository = yield* gitService.resolveGitRepository(git);
 
-    if (
-      Option.isNone(git.repository) &&
-      Option.isNone(git.branch) &&
-      interactiveGitRepository === null
-    ) {
-      throw new Error("No repository/worktree selected");
-    }
+    const matcher = pipe(
+      Match.type<SandboxConfig>(),
+      Match.discriminator("type")("tmux-worktree", () =>
+        WorkTreeSandbox.create(gitRepository)
+      ),
+      Match.discriminator("type")("tmux-main", () =>
+        notImplemented("create", "tmux-main")
+      ),
+      Match.discriminator("type")("docker", () =>
+        notImplemented("create", "docker")
+      ),
+      Match.discriminator("type")("ecs", () => notImplemented("create", "ecs")),
+      Match.exhaustive
+    );
 
-    const repository = Option.isSome(git.repository)
-      ? git.repository.value
-      : interactiveGitRepository?.repository ??
-        (yield* fuzzy.searchInDirectory(RepositoryPath.root(), {
-          throwOnNotFound: true,
-        }));
-    const branch = Option.isSome(git.branch)
-      ? git.branch.value
-      : interactiveGitRepository?.branch ??
-        (yield* Effect.gen(function* () {
-          const workTreeRepositoryPath = WorkTreePath.makeRepositoryPath({
-            repository,
-            branch: "main",
-          });
+    yield* matcher(config);
 
-          const workTreeRepositoryExists = yield* fs.exists(
-            workTreeRepositoryPath
-          );
+    yield* Effect.logInfo("Worktree ready");
+  }).pipe(Effect.provide(GitServiceImpl));
 
-          if (!workTreeRepositoryExists) {
-            return "main";
-          }
+/**
+ * Picks and attaches to a sandbox environment based on the provided configuration and Git repository information.
+ * Delegates to specific sandbox implementations (e.g., tmux-worktree) based on the 'type' field in the configuration.
+ *
+ * @since 1.0.0
+ * @category ServiceMethod
+ */
+const picker: SandboxService["picker"] = (config, git) =>
+  Effect.gen(function* () {
+    const gitService = yield* GitService;
+    const gitRepository = yield* gitService.resolveGitRepository(git);
 
-          return yield* fuzzy.searchInDirectory(workTreeRepositoryPath, {
-            additionalOptions: ["main"],
-            throwOnNotFound: true,
-          });
-        }));
+    const matcher = pipe(
+      Match.type<SandboxConfig>(),
+      Match.discriminator("type")("tmux-worktree", () =>
+        Effect.gen(function* () {
+          yield* WorkTreeSandbox.create(gitRepository);
+          yield* TmuxSandbox.attach(gitRepository);
+        })
+      ),
+      Match.discriminator("type")("tmux-main", () =>
+        notImplemented("picker", "tmux-main")
+      ),
+      Match.discriminator("type")("docker", () =>
+        notImplemented("picker", "docker")
+      ),
+      Match.discriminator("type")("ecs", () => notImplemented("picker", "ecs")),
+      Match.exhaustive
+    );
 
-    return GitRepository.makeUnsafe({
-      repository,
-      branch,
-    });
-  }).pipe(Effect.provide(FuzzyFindServiceImpl));
+    yield* matcher(config);
+  }).pipe(Effect.provide(GitServiceImpl));
 
+/**
+ * Removes a sandbox environment based on the provided configuration and Git repository information.
+ * Delegates to specific sandbox implementations (e.g., tmux-worktree) based on the 'type' field in the configuration.
+ *
+ * @since 1.0.0
+ * @category ServiceMethod
+ */
+const remove: SandboxService["remove"] = (config, git) =>
+  Effect.gen(function* () {
+    const gitService = yield* GitService;
+    const gitRepository = yield* gitService.resolveGitRepository(git);
+
+    const matcher = pipe(
+      Match.type<SandboxConfig>(),
+      Match.discriminator("type")("tmux-worktree", () =>
+        WorkTreeSandbox.remove(gitRepository)
+      ),
+      Match.discriminator("type")("tmux-main", () =>
+        notImplemented("remove", "tmux-main")
+      ),
+      Match.discriminator("type")("docker", () =>
+        notImplemented("remove", "docker")
+      ),
+      Match.discriminator("type")("ecs", () => notImplemented("remove", "ecs")),
+      Match.exhaustive
+    );
+
+    yield* matcher(config);
+
+    yield* Effect.logInfo("Workflow removed");
+  }).pipe(Effect.provide(GitServiceImpl));
+
+/**
+ * Implementation of SandboxService that delegates to specific sandbox implementations based on the provided configuration.
+ *
+ * @since 1.0.0
+ * @category Service
+ */
 export const SandboxServiceImpl = ServiceMap.make(SandboxService, {
-  create: (config, git) =>
-    Effect.gen(function* () {
-      const gitRepository = yield* resolveGitRepository(git);
-
-      yield* TmuxWorktreeSandbox.create(gitRepository);
-
-      yield* Effect.logInfo("Workflow created");
-    }),
-  picker: (config, git) =>
-    Effect.gen(function* () {
-      const gitRepository = yield* resolveGitRepository(git);
-
-      const matcher = pipe(
-        Match.type<SandboxConfig>(),
-        Match.discriminator("type")("tmux-worktree", () =>
-          TmuxWorktreeSandbox.create(gitRepository)
-        ),
-        Match.discriminator("type")("tmux-main", () =>
-          notImplemented("picker", "tmux-main")
-        ),
-        Match.discriminator("type")("docker", () =>
-          notImplemented("picker", "docker")
-        ),
-        Match.discriminator("type")("ecs", () =>
-          notImplemented("picker", "ecs")
-        ),
-        Match.exhaustive
-      );
-
-      yield* matcher(config);
-    }),
-  remove: (config, git) =>
-    Effect.gen(function* () {
-      const gitRepository = yield* resolveGitRepository(git);
-
-      const matcher = pipe(
-        Match.type<SandboxConfig>(),
-        Match.discriminator("type")("tmux-worktree", () =>
-          TmuxWorktreeSandbox.remove(gitRepository)
-        ),
-        Match.discriminator("type")("tmux-main", () =>
-          notImplemented("remove", "tmux-main")
-        ),
-        Match.discriminator("type")("docker", () =>
-          notImplemented("remove", "docker")
-        ),
-        Match.discriminator("type")("ecs", () =>
-          notImplemented("remove", "ecs")
-        ),
-        Match.exhaustive
-      );
-
-      yield* matcher(config);
-
-      yield* Effect.logInfo("Workflow removed");
-    }),
+  create,
+  picker,
+  remove,
 });
