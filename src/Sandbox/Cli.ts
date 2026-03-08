@@ -58,7 +58,10 @@ export const cloneCommand = Command.make(
         yield* handle.exitCode;
       })
     )
-).pipe(Command.withAlias("c"), Command.withDescription("Clone repository into local repository root"));
+).pipe(
+  Command.withAlias("c"),
+  Command.withDescription("Clone repository into local repository root")
+);
 
 export const addCommand = Command.make("add", flags, (config) =>
   Effect.gen(function* () {
@@ -97,4 +100,10 @@ export const removeCommand = Command.make("remove", flags, (config) =>
 ).pipe(
   Command.withAlias("rm"),
   Command.withDescription("Remove sandbox resources")
+);
+
+export const sandboxCommand = Command.make("sandbox").pipe(
+  Command.withAlias("s"),
+  Command.withDescription("Manage sandboxes"),
+  Command.withSubcommands([addCommand, removeCommand])
 );
