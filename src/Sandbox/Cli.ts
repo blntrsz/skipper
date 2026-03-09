@@ -7,6 +7,8 @@ import { GitRepositoryOption } from "../domain/GitRepository";
 import { SandboxServiceImpl } from "./Service";
 import * as RepositoryPath from "../domain/RepositoryPath";
 import type { Option } from "effect";
+import { SwitchService, SwitchServiceImpl } from "@/internal/SwitchService";
+import { PickerCancelled } from "@/internal/InteractivePicker";
 
 type SandboxCommandConfig = {
   readonly type: "tmux-worktree" | "tmux-main" | "docker" | "ecs";
@@ -128,6 +130,29 @@ export const removeCommand = Command.make("remove", flags, (config) =>
 ).pipe(
   Command.withAlias("rm"),
   Command.withDescription("Remove sandbox resources")
+);
+
+export const switchCommand = Command.make(
+  "switch",
+  {
+    repository: flags.git.repository,
+    branch: flags.git.branch,
+  },
+  (input) =>
+    Effect.gen(function* () {
+      const service = yield* SwitchService;
+
+      yield* service.run(input);
+    }).pipe(
+      Effect.catchIf(
+        (error): error is PickerCancelled => error instanceof PickerCancelled,
+        () => Effect.void
+      ),
+      Effect.provide(SwitchServiceImpl)
+    )
+).pipe(
+  Command.withAlias("sw"),
+  Command.withDescription("Pick repo and branch, then switch tmux")
 );
 
 export const sandboxCommand = Command.make("sandbox").pipe(
