@@ -1,5 +1,13 @@
 # @skippercorp/skipper
 
+## 1.2.7
+
+### Patch Changes
+
+- 8963edb: Move agent command and repository selection into internal services so CLI-facing modules focus on orchestration and sandbox adapters share git/tmux behavior.
+- 6a96c1b: Keep sandbox command wiring in `Sandbox/Cli` and re-export it into the root CLI so sandbox subcommands stay grouped in one module.
+- 3739ebb: Add folder-backed Docker sandboxes with user/repo override, repo-scoped image names, repo+branch container names, and create/remove flow without attach.
+
 ## 1.2.6
 
 ### Patch Changes
