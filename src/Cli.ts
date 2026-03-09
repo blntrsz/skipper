@@ -5,6 +5,7 @@ import packageJson from "../package.json";
 import { cloneCommand, sandboxCommand, switchCommand } from "./Sandbox/Cli";
 import { TaskCli } from "./Task/Cli";
 import { runCommand } from "./Agent/Cli";
+import { workflowCommand } from "./Workflow/Cli";
 
 const command = Command.make("skipper").pipe(
   Command.withSubcommands([
@@ -12,6 +13,7 @@ const command = Command.make("skipper").pipe(
     switchCommand,
     sandboxCommand,
     runCommand,
+    workflowCommand,
     TaskCli,
   ])
 );

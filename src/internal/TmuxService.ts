@@ -1,14 +1,14 @@
 import { Effect, ServiceMap } from "effect";
-import type { UnknownError } from "effect/Cause";
 import type { PlatformError } from "effect/PlatformError";
 import { ChildProcess } from "effect/unstable/process";
 import type { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
+import { TmuxError } from "@/internal/TmuxError";
 
 export const TmuxService = ServiceMap.Service<{
   attachSession: (
     sessionName: string,
     path: string
-  ) => Effect.Effect<void, PlatformError | UnknownError, ChildProcessSpawner>;
+  ) => Effect.Effect<void, PlatformError | TmuxError, ChildProcessSpawner>;
 }>("TmuxService");
 
 export const TmuxServiceImpl = ServiceMap.make(TmuxService, {
@@ -51,11 +51,23 @@ export const TmuxServiceImpl = ServiceMap.make(TmuxService, {
         }
 
         if (isInTmuxSession) {
-          yield* Effect.tryPromise(
-            () => Bun.$`tmux switch-client -t ${sessionName}`
-          );
+          yield* Effect.tryPromise({
+            try: () => Bun.$`tmux switch-client -t ${sessionName}`,
+            catch: (cause) =>
+              new TmuxError({
+                message: `Failed to switch tmux session '${sessionName}'`,
+                cause,
+              }),
+          });
         } else {
-          yield* Effect.tryPromise(() => Bun.$`tmux a -t ${sessionName}`);
+          yield* Effect.tryPromise({
+            try: () => Bun.$`tmux a -t ${sessionName}`,
+            catch: (cause) =>
+              new TmuxError({
+                message: `Failed to attach tmux session '${sessionName}'`,
+                cause,
+              }),
+          });
         }
       })
     ),

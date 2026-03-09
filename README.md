@@ -10,6 +10,8 @@
 
 Docker sandboxes can now be defined per user in `~/.config/skipper/sandbox/<name>/` or per repo in `~/.local/share/github/<repo>/.skipper/sandbox/<name>/`.
 
+Workflows can be defined per user in `~/.config/skipper/workflow/*.ts` or per workspace in `.skipper/workflow/*.ts`.
+
 ## Install
 
 ```bash
@@ -37,6 +39,9 @@ skipper sandbox add --type docker --repository repo --branch feature --sandbox d
 # Run a prompt in a repo
 skipper run --repository repo "fix typo in README"
 
+# Pick repo, branch, then workflow
+skipper workflow run
+
 # Remove sandbox resources
 skipper sandbox remove --repository repo --branch feature
 ```
@@ -49,6 +54,7 @@ skipper sandbox remove --repository repo --branch feature
 | `skipper sandbox add` | Create sandbox resources |
 | `skipper sandbox remove` (or `s rm`) | Remove sandbox resources |
 | `skipper run --repository <repo> "<prompt>"` | Run prompt in a repo |
+| `skipper workflow run` | Pick repo, branch, workflow and run it |
 | `skipper task create` | Create a task |
 | `skipper task list` | List all tasks |
 | `skipper task get --id <id>` | Get task by ID |
@@ -83,6 +89,49 @@ Optional `sandbox.json` fields:
 - container name is repo+branch scoped: `skipper-<repo>-<branch>-<sandbox>`
 - Docker flow creates missing worktree for non-`main`, builds image, starts container, then copies source with `docker cp`
 - Docker remove deletes container only; image stays cached
+
+## Workflows
+
+Workflow files are TypeScript modules discovered from:
+
+```text
+~/.config/skipper/workflow/*.ts
+~/.local/share/github/my-repo/.skipper/workflow/*.ts
+~/.local/share/skipper/worktree/my-repo/my-repo.feature/.skipper/workflow/*.ts
+```
+
+- `skipper workflow run` uses pickers: repository -> branch -> workflow
+- workflow name comes from the filename stem
+- if user + repo/worktree have same workflow name, repo/worktree wins
+- workflows run with `bun`
+- repo/worktree workflow lookup uses the selected workspace path
+
+Example workflow:
+
+```ts
+export default async function issueTriage(context, { issueNumber }) {
+  const details = await context.shell(
+    `gh issue view ${issueNumber} --json number,title,body,comments`
+  );
+  const comment = await context.prompt(
+    `Summarize triage for issue #${issueNumber}: ${details.stdout}`
+  );
+  await context.shell(`gh issue comment ${issueNumber} --body-file -`, {
+    stdin: comment,
+  });
+}
+```
+
+Optional input:
+
+```bash
+skipper workflow run --input '{"issueNumber":123}'
+```
+
+Workflow host API in V1:
+
+- `context.shell(command, { stdin? })` returns `{ stdout, stderr, exitCode }`
+- `context.prompt(text)` runs the configured agent command and returns stdout
 
 ## Requirements
 

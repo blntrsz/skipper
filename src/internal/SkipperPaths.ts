@@ -28,6 +28,11 @@ export const sandboxRoot = () =>
 export const repositorySandboxRoot = (repository: string) =>
   join(repositoryRoot(), repository, ".skipper/sandbox");
 
+export const workflowRoot = () => join(configRoot(), "workflow");
+
+export const workspaceWorkflowRoot = (workspacePath: string) =>
+  join(workspacePath, ".skipper/workflow");
+
 export const sanitizeNameSegment = (value: string) => {
   const clean = value.replace(/[^a-zA-Z0-9_.-]+/g, "-").replace(/^-+|-+$/g, "");
   return clean.length === 0 ? "default" : clean;

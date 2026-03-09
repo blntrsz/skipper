@@ -9,6 +9,7 @@ import { resolveWorkspacePath } from "@/domain/WorkspacePath";
 import * as WorkTreePath from "@/domain/WorkTreePath";
 import { pickOne, PickerCancelled } from "@/internal/InteractivePicker";
 import { sanitizeNameSegment } from "@/internal/SkipperPaths";
+import { TmuxError } from "@/internal/TmuxError";
 import { TmuxService } from "@/internal/TmuxService";
 
 const isInteractive = () =>
@@ -270,7 +271,7 @@ export const SwitchService = ServiceMap.Service<{
     readonly branch: Option.Option<string>;
   }) => Effect.Effect<
     void,
-    PlatformError | UnknownError | PickerCancelled,
+    PlatformError | UnknownError | PickerCancelled | TmuxError,
     ChildProcessSpawner | FileSystem.FileSystem
   >;
 }>("SwitchService");
