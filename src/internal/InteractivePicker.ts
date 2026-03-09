@@ -158,19 +158,26 @@ export const pickOne = <T>(
         const onKeypress = (value: string, key: { name?: string; ctrl?: boolean; meta?: boolean }) => {
           const matches = getMatches();
 
+          const isMoveUp = key.name === "up" || (key.ctrl === true && key.name === "p");
+          const isMoveDown = key.name === "down" || (key.ctrl === true && key.name === "n");
+
+          if (isMoveUp) {
+            if (matches.length > 0) {
+              selectedIndex = Math.max(0, selectedIndex - 1);
+            }
+            render();
+            return;
+          }
+
+          if (isMoveDown) {
+            if (matches.length > 0) {
+              selectedIndex = Math.min(matches.length - 1, selectedIndex + 1);
+            }
+            render();
+            return;
+          }
+
           switch (key.name) {
-            case "up":
-              if (matches.length > 0) {
-                selectedIndex = Math.max(0, selectedIndex - 1);
-              }
-              render();
-              return;
-            case "down":
-              if (matches.length > 0) {
-                selectedIndex = Math.min(matches.length - 1, selectedIndex + 1);
-              }
-              render();
-              return;
             case "backspace":
               query = query.slice(0, -1);
               selectedIndex = 0;
