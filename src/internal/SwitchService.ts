@@ -74,26 +74,32 @@ const listWorkTreePaths = (path: string) =>
         const values = yield* Effect.forEach(entries, (entry) =>
           Effect.gen(function* () {
             const entryPath = join(directory, entry);
-            const stats = yield* fs.stat(entryPath).pipe(
-              Effect.mapError(
-                (error) =>
-                  new UnknownError(error, `Failed to list '${directory}'`)
-              )
-            );
+            const stats = yield* fs
+              .stat(entryPath)
+              .pipe(
+                Effect.mapError(
+                  (error) =>
+                    new UnknownError(error, `Failed to list '${directory}'`)
+                )
+              );
 
             if (stats.type !== "Directory") {
               return [] as Array<string>;
             }
 
             const nextParts = [...parts, entry];
-            const isWorkTree = yield* fs.exists(join(entryPath, ".git")).pipe(
-              Effect.mapError(
-                (error) =>
-                  new UnknownError(error, `Failed to list '${entryPath}'`)
-              )
-            );
+            const isWorkTree = yield* fs
+              .exists(join(entryPath, ".git"))
+              .pipe(
+                Effect.mapError(
+                  (error) =>
+                    new UnknownError(error, `Failed to list '${entryPath}'`)
+                )
+              );
 
-            return isWorkTree ? [nextParts.join("/")] : yield* walk(entryPath, nextParts);
+            return isWorkTree
+              ? [nextParts.join("/")]
+              : yield* walk(entryPath, nextParts);
           })
         );
 

@@ -1,4 +1,5 @@
 import { Effect, ServiceMap } from "effect";
+import type { UnknownError } from "effect/Cause";
 import type { PlatformError } from "effect/PlatformError";
 import { ChildProcess } from "effect/unstable/process";
 import type { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
@@ -7,7 +8,7 @@ export const TmuxService = ServiceMap.Service<{
   attachSession: (
     sessionName: string,
     path: string
-  ) => Effect.Effect<void, PlatformError, ChildProcessSpawner>;
+  ) => Effect.Effect<void, PlatformError | UnknownError, ChildProcessSpawner>;
 }>("TmuxService");
 
 export const TmuxServiceImpl = ServiceMap.make(TmuxService, {
@@ -50,15 +51,11 @@ export const TmuxServiceImpl = ServiceMap.make(TmuxService, {
         }
 
         if (isInTmuxSession) {
-          const attachSessionHandle = yield* ChildProcess.make(
-            interactiveTmuxOptions
-          )`tmux switch-client -t ${sessionName}`;
-          yield* attachSessionHandle.exitCode;
+          yield* Effect.tryPromise(
+            () => Bun.$`tmux switch-client -t ${sessionName}`
+          );
         } else {
-          const attachSessionHandle = yield* ChildProcess.make(
-            interactiveTmuxOptions
-          )`tmux a -t ${sessionName}`;
-          yield* attachSessionHandle.exitCode;
+          yield* Effect.tryPromise(() => Bun.$`tmux a -t ${sessionName}`);
         }
       })
     ),
