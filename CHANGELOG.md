@@ -1,5 +1,11 @@
 # @skippercorp/skipper
 
+## 1.2.9
+
+### Patch Changes
+
+- cd766e8: Keep tmux switch aligned with the worktree layout by resolving branch names from nested worktree paths and by creating or attaching tmux sessions with the expected non-tmux fallback.
+
 ## 1.2.8
 
 ### Patch Changes
