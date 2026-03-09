@@ -1,5 +1,15 @@
 # @skippercorp/skipper
 
+## 1.3.0
+
+### Minor Changes
+
+- 3e8339d: add workflow runner from user or workspace definitions
+
+### Patch Changes
+
+- c00db45: fix effect process cleanup problem
+
 ## 1.2.9
 
 ### Patch Changes
