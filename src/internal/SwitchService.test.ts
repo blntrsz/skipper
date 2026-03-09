@@ -32,8 +32,19 @@ describe("SwitchService", () => {
 
     try {
       await mkdir(join(repositoryRoot, "demo", ".git"), { recursive: true });
-      await mkdir(join(workTreeRoot, "demo", "feature-a"), { recursive: true });
+      await mkdir(join(workTreeRoot, "demo", "demo.feature-a"), {
+        recursive: true,
+      });
+      await mkdir(join(workTreeRoot, "demo", "demo.feat", "test"), {
+        recursive: true,
+      });
       await mkdir(join(workTreeRoot, "demo", "bugfix"), { recursive: true });
+      await writeFile(join(workTreeRoot, "demo", "demo.feature-a", ".git"), "x\n");
+      await writeFile(
+        join(workTreeRoot, "demo", "demo.feat", "test", ".git"),
+        "x\n"
+      );
+      await writeFile(join(workTreeRoot, "demo", "bugfix", ".git"), "x\n");
 
       const branches = await Effect.runPromise(
         listBranches("demo", { repositoryRoot, workTreeRoot }).pipe(
@@ -41,7 +52,7 @@ describe("SwitchService", () => {
         )
       );
 
-      expect(branches).toEqual(["main", "bugfix", "feature-a"]);
+      expect(branches).toEqual(["main", "bugfix", "feat/test", "feature-a"]);
     } finally {
       await rm(root, { recursive: true, force: true });
     }
@@ -50,13 +61,13 @@ describe("SwitchService", () => {
   test("resolveTargetPath uses repo root for main", () => {
     expect(String(resolveTargetPath("demo", "main"))).toContain("/github/demo");
     expect(String(resolveTargetPath("demo", "feature-a"))).toContain(
-      "/skipper/worktree/demo/feature-a"
+      "/skipper/worktree/demo/demo.feature-a"
     );
   });
 
   test("makeSessionName sanitizes values", () => {
     expect(makeSessionName("team/repo", "feat/test branch")).toBe(
-      "team-repo--feat-test-branch"
+      "team-repo-feat-test-branch"
     );
   });
 

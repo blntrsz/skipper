@@ -34,12 +34,16 @@ const listDirectoryNames = (path: string) =>
           ? Effect.succeed([])
           : Effect.fail(error)
       ),
-      Effect.mapError((error) => new UnknownError(error, `Failed to list '${path}'`))
+      Effect.mapError(
+        (error) => new UnknownError(error, `Failed to list '${path}'`)
+      )
     );
     const values = yield* Effect.forEach(entries, (entry) =>
       fs.stat(join(path, entry)).pipe(
         Effect.map((stats) => (stats.type === "Directory" ? entry : null)),
-        Effect.mapError((error) => new UnknownError(error, `Failed to list '${path}'`))
+        Effect.mapError(
+          (error) => new UnknownError(error, `Failed to list '${path}'`)
+        )
       )
     );
 
@@ -47,6 +51,66 @@ const listDirectoryNames = (path: string) =>
       .filter((value): value is string => value !== null)
       .sort((left, right) => left.localeCompare(right));
   });
+
+const listWorkTreePaths = (path: string) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+
+    const walk = (
+      directory: string,
+      parts: ReadonlyArray<string>
+    ): Effect.Effect<Array<string>, UnknownError> =>
+      Effect.gen(function* () {
+        const entries = yield* fs.readDirectory(directory).pipe(
+          Effect.catchTag("PlatformError", (error) =>
+            error.reason._tag === "NotFound"
+              ? Effect.succeed([])
+              : Effect.fail(error)
+          ),
+          Effect.mapError(
+            (error) => new UnknownError(error, `Failed to list '${directory}'`)
+          )
+        );
+        const values = yield* Effect.forEach(entries, (entry) =>
+          Effect.gen(function* () {
+            const entryPath = join(directory, entry);
+            const stats = yield* fs.stat(entryPath).pipe(
+              Effect.mapError(
+                (error) =>
+                  new UnknownError(error, `Failed to list '${directory}'`)
+              )
+            );
+
+            if (stats.type !== "Directory") {
+              return [] as Array<string>;
+            }
+
+            const nextParts = [...parts, entry];
+            const isWorkTree = yield* fs.exists(join(entryPath, ".git")).pipe(
+              Effect.mapError(
+                (error) =>
+                  new UnknownError(error, `Failed to list '${entryPath}'`)
+              )
+            );
+
+            return isWorkTree ? [nextParts.join("/")] : yield* walk(entryPath, nextParts);
+          })
+        );
+
+        return values.flat();
+      });
+
+    return yield* walk(path, []);
+  });
+
+const workTreePathToBranch = (repository: string, path: string) => {
+  const [head = "", ...tail] = path.split(/[\\/]/);
+  const prefix = `${repository}.`;
+
+  return [head.startsWith(prefix) ? head.slice(prefix.length) : head, ...tail]
+    .filter((value) => value.length > 0)
+    .join("/");
+};
 
 export const sortBranches = (branches: ReadonlyArray<string>) =>
   [...new Set(branches)].sort((left, right) => {
@@ -62,7 +126,7 @@ export const sortBranches = (branches: ReadonlyArray<string>) =>
   });
 
 export const makeSessionName = (repository: string, branch: string) => {
-  return `${sanitizeNameSegment(repository)}--${sanitizeNameSegment(branch)}`;
+  return `${sanitizeNameSegment(repository)}-${sanitizeNameSegment(branch)}`;
 };
 
 export const resolveTargetPath = (repository: string, branch: string) =>
@@ -96,7 +160,10 @@ export const listBranches = (
     const workTreeRoot = options?.workTreeRoot ?? WorkTreePath.root();
     const repositoryPath = join(repositoryRoot, repository);
     const repositoryExists = yield* pathExists(repositoryPath).pipe(
-      Effect.mapError((error) => new UnknownError(error, `Failed to read repository '${repository}'`))
+      Effect.mapError(
+        (error) =>
+          new UnknownError(error, `Failed to read repository '${repository}'`)
+      )
     );
 
     if (!repositoryExists) {
@@ -108,13 +175,19 @@ export const listBranches = (
       );
     }
 
-    const branches = yield* listDirectoryNames(join(workTreeRoot, repository)).pipe(
+    const branches = yield* listWorkTreePaths(
+      join(workTreeRoot, repository)
+    ).pipe(
       Effect.mapError(
-        (error) => new UnknownError(error, `Failed to list branches for '${repository}'`)
+        (error) =>
+          new UnknownError(error, `Failed to list branches for '${repository}'`)
       )
     );
 
-    return sortBranches(["main", ...branches]);
+    return sortBranches([
+      "main",
+      ...branches.map((path) => workTreePathToBranch(repository, path)),
+    ]);
   });
 
 const ensureInteractive = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
@@ -172,7 +245,10 @@ const pickRepository = () =>
 
     return yield* pickOne(
       "Repository",
-      repositories.map((repository) => ({ label: repository, value: repository }))
+      repositories.map((repository) => ({
+        label: repository,
+        value: repository,
+      }))
     );
   });
 
@@ -202,7 +278,10 @@ export const SwitchServiceImpl = Layer.effect(
       Effect.gen(function* () {
         if (!hasTerminal()) {
           return yield* Effect.fail(
-            new UnknownError(undefined, "Switch requires an interactive terminal")
+            new UnknownError(
+              undefined,
+              "Switch requires an interactive terminal"
+            )
           );
         }
 
@@ -217,7 +296,10 @@ export const SwitchServiceImpl = Layer.effect(
         const targetExists = yield* pathExists(targetPath).pipe(
           Effect.mapError(
             (error) =>
-              new UnknownError(error, `Failed to resolve path for '${repository}:${branch}'`)
+              new UnknownError(
+                error,
+                `Failed to resolve path for '${repository}:${branch}'`
+              )
           )
         );
 
@@ -230,7 +312,10 @@ export const SwitchServiceImpl = Layer.effect(
           );
         }
 
-        yield* tmux.attachSession(makeSessionName(repository, branch), targetPath);
+        yield* tmux.attachSession(
+          makeSessionName(repository, branch),
+          targetPath
+        );
       });
 
     return { run } satisfies typeof SwitchService.Service;

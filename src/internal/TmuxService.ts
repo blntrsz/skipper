@@ -1,4 +1,4 @@
-import { Effect, ServiceMap, Stream } from "effect";
+import { Effect, ServiceMap } from "effect";
 import type { PlatformError } from "effect/PlatformError";
 import { ChildProcess } from "effect/unstable/process";
 import type { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
@@ -15,42 +15,51 @@ export const TmuxServiceImpl = ServiceMap.make(TmuxService, {
     Effect.scoped(
       Effect.gen(function* () {
         const isInTmuxSession = !!process.env.TMUX;
-        const tmuxOptions = { detached: false };
+        const tmuxOptions = {
+          detached: false,
+        };
+        const interactiveTmuxOptions = {
+          cwd: path,
+          ...tmuxOptions,
+          stdin: "inherit" as const,
+          stdout: "inherit" as const,
+          stderr: "inherit" as const,
+        };
 
-        if (isInTmuxSession) {
-          const hasSessionHandle = yield* ChildProcess.make(
-            tmuxOptions
-          )`tmux has-session -t ${sessionName}`;
-          const hasSessionExitCode = Number(yield* hasSessionHandle.exitCode);
+        const tmuxRunningHandler = yield* ChildProcess.make`pgrep tmux`;
+        const isTmuxRunning = Number(yield* tmuxRunningHandler.exitCode) === 0;
 
-          if (hasSessionExitCode !== 0) {
-            const createSessionHandle = yield* ChildProcess.make(
-              tmuxOptions
-            )`tmux new-session -ds ${sessionName} -c ${path}`;
-            yield* createSessionHandle.exitCode;
-          }
-
-          const switchClientHandle = yield* ChildProcess.make(
-            {
-              ...tmuxOptions,
-              stdin: "inherit",
-              stdout: "inherit",
-              stderr: "inherit",
-            }
-          )`tmux switch-client -t ${sessionName}`;
-          yield* switchClientHandle.exitCode;
-
+        if (!isInTmuxSession && !isTmuxRunning) {
+          const createSessionHandle = yield* ChildProcess.make(
+            interactiveTmuxOptions
+          )`tmux new-session -s ${sessionName} -c ${path}`;
+          yield* createSessionHandle.exitCode;
           return;
         }
 
-        const attachSessionHandle = yield* ChildProcess.make({
-          cwd: path,
-          ...tmuxOptions,
-          stdin: "inherit",
-          stdout: "inherit",
-          stderr: "inherit",
-        })`tmux new-session -As ${sessionName} -c ${path}`;
-        yield* attachSessionHandle.exitCode;
+        const hasSessionHandle = yield* ChildProcess.make(
+          tmuxOptions
+        )`tmux has-session -t ${sessionName}`;
+        const hasTmuxSession = Number(yield* hasSessionHandle.exitCode) === 0;
+
+        if (!hasTmuxSession) {
+          const createSessionHandle = yield* ChildProcess.make(
+            tmuxOptions
+          )`tmux new-session -ds ${sessionName} -c ${path}`;
+          yield* createSessionHandle.exitCode;
+        }
+
+        if (isInTmuxSession) {
+          const attachSessionHandle = yield* ChildProcess.make(
+            interactiveTmuxOptions
+          )`tmux switch-client -t ${sessionName}`;
+          yield* attachSessionHandle.exitCode;
+        } else {
+          const attachSessionHandle = yield* ChildProcess.make(
+            interactiveTmuxOptions
+          )`tmux a -t ${sessionName}`;
+          yield* attachSessionHandle.exitCode;
+        }
       })
     ),
 });

@@ -9,7 +9,7 @@ export type WorkTreePath = typeof WorkTreePath.Type;
 
 export function make(git: GitRepository): WorkTreePath {
   return WorkTreePath.makeUnsafe(
-    join(workTreeRoot(), git.repository, git.branch)
+    join(workTreeRoot(), git.repository, `${git.repository}.${git.branch}`)
   );
 }
 
