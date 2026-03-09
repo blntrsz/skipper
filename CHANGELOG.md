@@ -1,5 +1,12 @@
 # @skippercorp/skipper
 
+## 1.2.8
+
+### Patch Changes
+
+- 6a23c2c: Add `Ctrl+n` and `Ctrl+p` navigation to the interactive picker so switcher selection supports vim-style movement alongside arrow keys.
+- 63a7f88: Replace the old picker flow with a top-level `switch` command so repo and branch selection stay explicit while tmux switching works with a lighter built-in interactive picker.
+
 ## 1.2.7
 
 ### Patch Changes
