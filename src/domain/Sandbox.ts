@@ -14,6 +14,7 @@ export type TmuxMainSandboxConfig = typeof TmuxMainSandboxConfig.Type;
 
 export const DockerSandboxConfig = Schema.Struct({
   type: Schema.Literal("docker"),
+  sandbox: Schema.Option(Schema.String),
 });
 
 export type DockerSandboxConfig = typeof DockerSandboxConfig.Type;

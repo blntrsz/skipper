@@ -2,10 +2,33 @@ import { Effect, FileSystem } from "effect";
 import { Argument, Command, Flag } from "effect/unstable/cli";
 import { ChildProcess } from "effect/unstable/process";
 import { SandboxService } from "./Port";
-import { SandboxConfig } from "../domain/Sandbox";
+import type { SandboxConfig } from "../domain/Sandbox";
 import { GitRepositoryOption } from "../domain/GitRepository";
 import { SandboxServiceImpl } from "./Service";
 import * as RepositoryPath from "../domain/RepositoryPath";
+import type { Option } from "effect";
+
+type SandboxCommandConfig = {
+  readonly type: "tmux-worktree" | "tmux-main" | "docker" | "ecs";
+  readonly sandbox: Option.Option<string>;
+};
+
+const toSandboxConfig = (config: SandboxCommandConfig): SandboxConfig => {
+  switch (config.type) {
+    case "docker":
+      return {
+        type: "docker",
+        sandbox: config.sandbox,
+      };
+    case "tmux-main":
+      return { type: "tmux-main" };
+    case "ecs":
+      return { type: "ecs" };
+    case "tmux-worktree":
+    default:
+      return { type: "tmux-worktree" };
+  }
+};
 
 const flags = {
   type: Flag.choice("type", [
@@ -16,6 +39,11 @@ const flags = {
   ]).pipe(
     Flag.withDefault("tmux-worktree"),
     Flag.withDescription("Sandbox backend type")
+  ),
+  sandbox: Flag.optional(
+    Flag.string("sandbox").pipe(
+      Flag.withDescription("Sandbox name (uses interactive picker when omitted)")
+    )
   ),
   git: {
     repository: Flag.optional(
@@ -68,24 +96,24 @@ export const addCommand = Command.make("add", flags, (config) =>
     const service = yield* SandboxService;
 
     yield* service.create(
-      SandboxConfig.makeUnsafe(config),
+      toSandboxConfig(config),
       GitRepositoryOption.makeUnsafe(config.git)
     );
   }).pipe(Effect.provide(SandboxServiceImpl))
-).pipe(Command.withDescription("Create worktree"));
+).pipe(Command.withDescription("Create sandbox resources"));
 
 export const pickerCommand = Command.make("picker", flags, (config) =>
   Effect.gen(function* () {
     const service = yield* SandboxService;
 
     yield* service.picker(
-      SandboxConfig.makeUnsafe(config),
+      toSandboxConfig(config),
       GitRepositoryOption.makeUnsafe(config.git)
     );
   }).pipe(Effect.provide(SandboxServiceImpl))
 ).pipe(
   Command.withAlias("p"),
-  Command.withDescription("Open interactive repository/worktree picker")
+  Command.withDescription("Open interactive sandbox picker")
 );
 
 export const removeCommand = Command.make("remove", flags, (config) =>
@@ -93,7 +121,7 @@ export const removeCommand = Command.make("remove", flags, (config) =>
     const service = yield* SandboxService;
 
     yield* service.remove(
-      SandboxConfig.makeUnsafe(config),
+      toSandboxConfig(config),
       GitRepositoryOption.makeUnsafe(config.git)
     );
   }).pipe(Effect.provide(SandboxServiceImpl))
@@ -105,5 +133,5 @@ export const removeCommand = Command.make("remove", flags, (config) =>
 export const sandboxCommand = Command.make("sandbox").pipe(
   Command.withAlias("s"),
   Command.withDescription("Manage sandboxes"),
-  Command.withSubcommands([addCommand, removeCommand])
+  Command.withSubcommands([addCommand, pickerCommand, removeCommand])
 );
