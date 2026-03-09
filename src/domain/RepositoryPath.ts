@@ -1,15 +1,13 @@
 import { Schema } from "effect";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import type { GitRepository } from "./GitRepository";
+import { repositoryRoot } from "@/internal/SkipperPaths";
 
 export const RepositoryPath = Schema.String.pipe(
   Schema.brand("RepositoryPath")
 );
 
 export type RepositoryPath = typeof RepositoryPath.Type;
-
-const REPOSITORY_ROOT = join(homedir(), ".local/share/github");
 
 /**
  * Build the repository root path for a repo name.
@@ -19,7 +17,7 @@ const REPOSITORY_ROOT = join(homedir(), ".local/share/github");
  */
 export function make(repository: GitRepository["repository"]): RepositoryPath {
   return RepositoryPath.makeUnsafe(
-    join(REPOSITORY_ROOT, requireRepositoryName(repository))
+    join(repositoryRoot(), requireRepositoryName(repository))
   );
 }
 
@@ -30,7 +28,7 @@ export function make(repository: GitRepository["repository"]): RepositoryPath {
  * @category Shared
  */
 export function root() {
-  return REPOSITORY_ROOT;
+  return repositoryRoot();
 }
 
 /**

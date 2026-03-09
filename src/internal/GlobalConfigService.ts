@@ -1,9 +1,9 @@
 import { Effect, FileSystem, PlatformError, ServiceMap } from "effect";
-import { homedir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import { GlobalConfig } from "../domain/GlobalConfig";
+import { globalConfigPath } from "./SkipperPaths";
 
-export const GLOBAL_CONFIG_PATH = join(homedir(), ".config/skipper/config.json");
+export const GLOBAL_CONFIG_PATH = globalConfigPath();
 
 const parseConfig = (content: string): GlobalConfig => {
   try {

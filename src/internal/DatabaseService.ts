@@ -2,12 +2,11 @@ import { Effect, FileSystem, Layer, String } from "effect";
 import { SqliteClient } from "@effect/sql-sqlite-bun";
 import { SqliteMigrator } from "@effect/sql-sqlite-bun";
 import { BunFileSystem } from "@effect/platform-bun";
-import { homedir } from "node:os";
-import { join } from "node:path";
 import { migrations } from "../migrations";
+import { databaseDir, databasePath } from "./SkipperPaths";
 
-const DB_PATH = join(homedir(), ".local/share/skipper/skipper.db");
-const DB_DIR = join(homedir(), ".local/share/skipper");
+const DB_PATH = databasePath();
+const DB_DIR = databaseDir();
 
 const migratorOptions = {
   loader: SqliteMigrator.fromRecord(migrations),

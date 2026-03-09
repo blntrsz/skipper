@@ -1,24 +1,22 @@
 import { Schema } from "effect";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import type { GitRepository } from "./GitRepository";
+import { workTreeRoot } from "@/internal/SkipperPaths";
 
 export const WorkTreePath = Schema.String.pipe(Schema.brand("WorkTreePath"));
 
 export type WorkTreePath = typeof WorkTreePath.Type;
 
-const WORKTREE_ROOT = join(homedir(), ".local/share/skipper/worktree");
-
 export function make(git: GitRepository): WorkTreePath {
   return WorkTreePath.makeUnsafe(
-    join(WORKTREE_ROOT, git.repository, git.branch)
+    join(workTreeRoot(), git.repository, git.branch)
   );
 }
 
 export function makeRepositoryPath(git: GitRepository): WorkTreePath {
-  return WorkTreePath.makeUnsafe(join(WORKTREE_ROOT, git.repository));
+  return WorkTreePath.makeUnsafe(join(workTreeRoot(), git.repository));
 }
 
 export function root() {
-  return WORKTREE_ROOT;
+  return workTreeRoot();
 }

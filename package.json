@@ -41,11 +41,8 @@
     "@effect/platform-bun": "4.0.0-beta.27",
     "@effect/sql-sqlite-bun": "4.0.0-beta.27",
     "@effect/vitest": "4.0.0-beta.27",
-    "fuse.js": "^7.1.0",
     "@octokit/webhooks": "^13.7.1",
     "@octokit/webhooks-types": "^7.6.1",
-    "@opentui-ui/dialog": "^0.1.2",
-    "@opentui/core": "^0.1.84",
     "commander": "^14.0.3",
     "effect": "4.0.0-beta.27",
     "ulid": "^3.0.2"

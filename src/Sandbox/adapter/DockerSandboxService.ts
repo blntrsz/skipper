@@ -5,22 +5,20 @@ import { ChildProcess } from "effect/unstable/process";
 import type { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
 import type { DockerSandboxDefinition } from "@/domain/DockerSandboxDefinition";
 import type { GitRepository } from "@/domain/GitRepository";
-import * as RepositoryPath from "@/domain/RepositoryPath";
-import * as WorkTreePath from "@/domain/WorkTreePath";
+import { resolveWorkspacePath } from "@/domain/WorkspacePath";
+import { sanitizeNameSegment } from "@/internal/SkipperPaths";
 
 type DockerSandboxIdentity = {
   readonly imageName: string;
   readonly containerName: string;
 };
 
-const sanitize = (value: string) => value.replace(/[^a-zA-Z0-9_.-]+/g, "-");
-
 export const getIdentity = (
   gitRepository: GitRepository,
   definition: DockerSandboxDefinition
 ): DockerSandboxIdentity => ({
-  imageName: `skipper-${sanitize(gitRepository.repository)}:${sanitize(definition.name)}`,
-  containerName: `skipper-${sanitize(gitRepository.repository)}-${sanitize(gitRepository.branch)}-${sanitize(definition.name)}`,
+  imageName: `skipper-${sanitizeNameSegment(gitRepository.repository)}:${sanitizeNameSegment(definition.name)}`,
+  containerName: `skipper-${sanitizeNameSegment(gitRepository.repository)}-${sanitizeNameSegment(gitRepository.branch)}-${sanitizeNameSegment(definition.name)}`,
 });
 
 export const getCreateCommands = (
@@ -50,9 +48,7 @@ export const getCreateCommands = (
 };
 
 const resolveSourcePath = (gitRepository: GitRepository) =>
-  gitRepository.branch === "main"
-    ? RepositoryPath.make(gitRepository.repository)
-    : WorkTreePath.make(gitRepository);
+  resolveWorkspacePath(gitRepository);
 
 const ensureSourcePath = (gitRepository: GitRepository) =>
   Effect.gen(function* () {

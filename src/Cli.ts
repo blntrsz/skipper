@@ -2,15 +2,15 @@ import { Effect, Logger } from "effect";
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { CliError, Command } from "effect/unstable/cli";
 import packageJson from "../package.json";
-import { cloneCommand, pickerCommand, sandboxCommand } from "./Sandbox/Cli";
+import { cloneCommand, sandboxCommand, switchCommand } from "./Sandbox/Cli";
 import { TaskCli } from "./Task/Cli";
 import { runCommand } from "./Agent/Cli";
 
 const command = Command.make("skipper").pipe(
   Command.withSubcommands([
     cloneCommand,
+    switchCommand,
     sandboxCommand,
-    pickerCommand,
     runCommand,
     TaskCli,
   ])

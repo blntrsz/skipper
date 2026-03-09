@@ -10,6 +10,17 @@ export const DockerSandboxFile = Schema.Struct({
 
 export type DockerSandboxFile = typeof DockerSandboxFile.Type;
 
+export const normalizeDockerSandboxFile = (file: DockerSandboxFile) => ({
+  containerPath:
+    typeof file.containerPath === "string" && file.containerPath.length > 0
+      ? file.containerPath
+      : DEFAULT_DOCKER_SANDBOX_CONTAINER_PATH,
+  command:
+    Array.isArray(file.command) && file.command.length > 0
+      ? file.command
+      : [...DEFAULT_DOCKER_SANDBOX_COMMAND],
+});
+
 export const DockerSandboxDefinitionSource = Schema.Union([
   Schema.Literal("user"),
   Schema.Literal("repo"),

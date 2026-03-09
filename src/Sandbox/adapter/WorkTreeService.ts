@@ -2,7 +2,7 @@ import { Effect, FileSystem } from "effect";
 import * as RepositoryPath from "@/domain/RepositoryPath";
 import * as WorkTreePath from "@/domain/WorkTreePath";
 import type { GitRepository } from "@/domain/GitRepository";
-import { GitService, GitServiceImpl } from "@/internal/GitService";
+import { GitService } from "@/internal/GitService";
 
 export const create = (config: GitRepository) =>
   Effect.gen(function* () {
@@ -24,7 +24,7 @@ export const create = (config: GitRepository) =>
 
     yield* fs.makeDirectory(workTreeRepositoryPath, { recursive: true });
     yield* git.createWorkTree(repositoryPath, workTreePath);
-  }).pipe(Effect.provide(GitServiceImpl));
+  });
 
 export const remove = (config: GitRepository) =>
   Effect.gen(function* () {
@@ -44,4 +44,4 @@ export const remove = (config: GitRepository) =>
 
     yield* git.removeWorkTree(repositoryPath, workTreePath);
     yield* fs.remove(workTreePath, { recursive: true, force: true });
-  }).pipe(Effect.provide(GitServiceImpl));
+  });

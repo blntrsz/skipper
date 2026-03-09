@@ -1,7 +1,6 @@
-import { Effect, Schema, ServiceMap } from "effect";
+import { Effect, ServiceMap } from "effect";
 import * as Task from "../domain/Task";
 import { TaskRepository } from "./Repository";
-import { SqlClient, SqlResolver } from "effect/unstable/sql";
 import { TaskService } from "./Port";
 
 const create: TaskService["create"] = (data) =>
@@ -24,39 +23,14 @@ const get: TaskService["get"] = (id) =>
 
 const getByRepository: TaskService["getByRepository"] = (repository) =>
   Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient;
-
-    const resolver = SqlResolver.ordered({
-      Request: Schema.String,
-      Result: Schema.Array(Task.Task),
-      execute: (requests) =>
-        Effect.forEach(
-          requests,
-          (repository) => sql`SELECT * FROM tasks WHERE repository = ${repository}`
-        ),
-    });
-
-    return yield* SqlResolver.request(repository, resolver).pipe(
-      Effect.catchTag("ResultLengthMismatch", () => Effect.succeed([]))
-    );
+    const taskRepository = yield* TaskRepository;
+    return yield* taskRepository.findByRepository(repository);
   });
 
 const getAll: TaskService["getAll"] = () =>
   Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient;
-
-    const resolver = SqlResolver.ordered({
-      Request: Schema.Void,
-      Result: Schema.Array(Task.Task),
-      execute: (requests) =>
-        sql`SELECT * FROM tasks`.pipe(
-          Effect.map((tasks) => requests.map(() => tasks))
-        ),
-    });
-
-    return yield* SqlResolver.request(undefined, resolver).pipe(
-      Effect.catchTag("ResultLengthMismatch", () => Effect.succeed([]))
-    );
+    const taskRepository = yield* TaskRepository;
+    return yield* taskRepository.findAll();
   });
 
 const update: TaskService["update"] = (id, state) =>

@@ -1,26 +1,17 @@
-import { Effect, FileSystem, Option, ServiceMap } from "effect";
+import { Effect, FileSystem, Option, Schema, ServiceMap } from "effect";
 import type { PlatformError } from "effect/PlatformError";
 import { UnknownError } from "effect/Cause";
-import { readdir, stat } from "node:fs/promises";
-import { homedir } from "node:os";
 import { join } from "node:path";
 import {
-  DEFAULT_DOCKER_SANDBOX_COMMAND,
-  DEFAULT_DOCKER_SANDBOX_CONTAINER_PATH,
+  DockerSandboxFile,
   type DockerSandboxDefinition as DockerSandboxDefinitionType,
   type DockerSandboxDefinitionSource,
+  normalizeDockerSandboxFile,
 } from "@/domain/DockerSandboxDefinition";
-import { pickSingleOption } from "./picker/OpenTuiPicker";
+import { repositorySandboxRoot, sandboxRoot } from "@/internal/SkipperPaths";
 
-const REPOSITORY_SANDBOX_DIR = ".skipper/sandbox";
 const DOCKERFILE_NAME = "Dockerfile";
 const SANDBOX_CONFIG_CANDIDATES = ["sandbox.json", "config.json"] as const;
-
-const userSandboxRoot = () =>
-  process.env.SKIPPER_SANDBOX_ROOT ?? join(homedir(), ".config/skipper/sandbox");
-
-const repositoryRoot = () =>
-  process.env.SKIPPER_REPOSITORY_ROOT ?? join(homedir(), ".local/share/github");
 
 type ListedSandbox = {
   readonly source: DockerSandboxDefinitionSource;
@@ -28,24 +19,31 @@ type ListedSandbox = {
 };
 
 const readDirectoryNames = (directory: string) =>
-  Effect.tryPromise({
-    try: async () => {
-      const entries = await readdir(directory);
-      const values = await Promise.all(
-        entries.map(async (entry) => {
-          const stats = await stat(join(directory, entry));
-          return stats.isDirectory() ? entry : null;
-        })
-      );
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const entries = yield* fs.readDirectory(directory).pipe(
+      Effect.catchTag("PlatformError", (error) =>
+        error.reason._tag === "NotFound"
+          ? Effect.succeed([])
+          : Effect.fail(error)
+      ),
+      Effect.mapError((error) => new UnknownError(error, `Failed to list '${directory}'`))
+    );
 
-      return values.filter((value): value is string => value !== null).sort();
-    },
-    catch: (error) => new UnknownError(error, `Failed to list '${directory}'`),
+    const values = yield* Effect.forEach(entries, (entry) =>
+      fs.stat(join(directory, entry)).pipe(
+        Effect.map((stats) => (stats.type === "Directory" ? entry : null)),
+        Effect.mapError((error) => new UnknownError(error, `Failed to list '${directory}'`))
+      )
+    );
+
+    return values.filter((value): value is string => value !== null).sort();
   });
 
 const readSandboxFile = (directory: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
+    const decodeSandboxFile = Schema.decodeUnknownEffect(DockerSandboxFile);
 
     for (const name of SANDBOX_CONFIG_CANDIDATES) {
       const path = join(directory, name);
@@ -55,41 +53,18 @@ const readSandboxFile = (directory: string) =>
       }
 
       const content = yield* fs.readFileString(path);
+      const parsed = yield* Effect.try({
+        try: () => JSON.parse(content),
+        catch: (error) => new UnknownError(error, `Invalid sandbox config '${path}'`),
+      });
+      const file = yield* decodeSandboxFile(parsed).pipe(
+        Effect.mapError((error) => new UnknownError(error, `Invalid sandbox config '${path}'`))
+      );
 
-      try {
-        const parsed = JSON.parse(content);
-
-        if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-          return yield* Effect.fail(
-            new UnknownError(undefined, `Invalid sandbox config '${path}'`)
-          );
-        }
-
-        const containerPath =
-          typeof parsed.containerPath === "string" && parsed.containerPath.length > 0
-            ? parsed.containerPath
-            : DEFAULT_DOCKER_SANDBOX_CONTAINER_PATH;
-        const command = Array.isArray(parsed.command)
-          ? parsed.command.filter(
-              (value: unknown): value is string => typeof value === "string"
-            )
-          : [...DEFAULT_DOCKER_SANDBOX_COMMAND];
-
-        return {
-          containerPath,
-          command: command.length > 0 ? command : [...DEFAULT_DOCKER_SANDBOX_COMMAND],
-        };
-      } catch (error) {
-        return yield* Effect.fail(
-          new UnknownError(error, `Invalid sandbox config '${path}'`)
-        );
-      }
+      return normalizeDockerSandboxFile(file);
     }
 
-    return {
-      containerPath: DEFAULT_DOCKER_SANDBOX_CONTAINER_PATH,
-      command: [...DEFAULT_DOCKER_SANDBOX_COMMAND],
-    };
+    return normalizeDockerSandboxFile({});
   });
 
 const listSandboxesInDirectory = (
@@ -97,9 +72,7 @@ const listSandboxesInDirectory = (
   source: DockerSandboxDefinitionSource
 ) =>
   Effect.gen(function* () {
-    const names = yield* readDirectoryNames(root).pipe(
-      Effect.catch(() => Effect.succeed([] as readonly string[]))
-    );
+    const names = yield* readDirectoryNames(root);
 
     return new Map(
       names.map(
@@ -147,9 +120,9 @@ const loadDockerSandboxDefinition = (
 
 export const listDockerSandboxDefinitions = (repository: string) =>
   Effect.gen(function* () {
-    const userSandboxes = yield* listSandboxesInDirectory(userSandboxRoot(), "user");
+    const userSandboxes = yield* listSandboxesInDirectory(sandboxRoot(), "user");
     const repoSandboxes = yield* listSandboxesInDirectory(
-      join(repositoryRoot(), repository, REPOSITORY_SANDBOX_DIR),
+      repositorySandboxRoot(repository),
       "repo"
     );
     const merged = new Map([...userSandboxes, ...repoSandboxes]);
@@ -201,24 +174,18 @@ export const SandboxDefinitionServiceImpl = ServiceMap.make(
           );
         }
 
-        const selectedName = Option.isSome(sandbox)
-          ? sandbox.value
-          : yield* Effect.tryPromise({
-              try: () =>
-                pickSingleOption({
-                  title: `Docker sandboxes for ${repository}`,
-                  options: definitions.map(
-                    (definition: DockerSandboxDefinitionType) =>
-                      definition.source === "repo"
-                        ? `${definition.name} (repo)`
-                        : `${definition.name} (user)`
-                  ),
-                }),
-              catch: (error) =>
-                new UnknownError(error, "Docker sandbox picker failed"),
-            }).pipe(
-              Effect.map((value) => value.replace(/ \((repo|user)\)$/, ""))
-            );
+        if (Option.isNone(sandbox)) {
+          return yield* Effect.fail(
+            new UnknownError(
+              undefined,
+              `Missing --sandbox for '${repository}'. Available: ${definitions
+                .map((definition) => definition.name)
+                .join(", ")}`
+            )
+          );
+        }
+
+        const selectedName = sandbox.value;
 
         const definition = definitions.find(
           (item: DockerSandboxDefinitionType) => item.name === selectedName

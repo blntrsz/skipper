@@ -28,20 +28,17 @@ bunx @skippercorp/skipper --help
 # Clone a repo
 skipper clone owner/repo
 
-# Open interactive picker
-skipper p
-
 # Create sandbox resources
-skipper sandbox add
+skipper sandbox add --repository repo --branch feature
 
 # Create Docker sandbox
 skipper sandbox add --type docker --repository repo --branch feature --sandbox dev
 
 # Run a prompt in a repo
-skipper run "fix typo in README"
+skipper run --repository repo "fix typo in README"
 
 # Remove sandbox resources
-skipper sandbox remove
+skipper sandbox remove --repository repo --branch feature
 ```
 
 ## Commands
@@ -50,10 +47,8 @@ skipper sandbox remove
 |---------|-------------|
 | `skipper clone <owner/repo>` | Clone repo into `~/.local/share/github/<repo>` |
 | `skipper sandbox add` | Create sandbox resources |
-| `skipper sandbox picker` (or `s p`) | Open interactive sandbox picker |
-| `skipper picker` (or `p`) | Open interactive repo/worktree picker |
 | `skipper sandbox remove` (or `s rm`) | Remove sandbox resources |
-| `skipper run "<prompt>"` | Run prompt in selected repo |
+| `skipper run --repository <repo> "<prompt>"` | Run prompt in a repo |
 | `skipper task create` | Create a task |
 | `skipper task list` | List all tasks |
 | `skipper task get --id <id>` | Get task by ID |
@@ -87,7 +82,6 @@ Optional `sandbox.json` fields:
 - image name is repo-scoped: `skipper-<repo>:<sandbox>`
 - container name is repo+branch scoped: `skipper-<repo>-<branch>-<sandbox>`
 - Docker flow creates missing worktree for non-`main`, builds image, starts container, then copies source with `docker cp`
-- Docker picker creates only; no attach
 - Docker remove deletes container only; image stays cached
 
 ## Requirements
@@ -95,7 +89,6 @@ Optional `sandbox.json` fields:
 - `bun`
 - `git`
 - `gh` (GitHub CLI)
-- terminal with TTY support (for interactive picker)
 - `tmux`
 
 ## Development

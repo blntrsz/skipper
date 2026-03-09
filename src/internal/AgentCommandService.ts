@@ -1,12 +1,8 @@
-import { Effect, FileSystem, ServiceMap } from "effect";
+import { Effect, FileSystem, Layer, ServiceMap } from "effect";
 import { UnknownError } from "effect/Cause";
 import type { PlatformError } from "effect/PlatformError";
 import { createInterface } from "node:readline/promises";
-import {
-  GLOBAL_CONFIG_PATH,
-  GlobalConfigService,
-  GlobalConfigServiceImpl,
-} from "@/internal/GlobalConfigService";
+import { GLOBAL_CONFIG_PATH, GlobalConfigService } from "@/internal/GlobalConfigService";
 
 const commandPrompt = "Command missing. Enter command: ";
 
@@ -40,34 +36,40 @@ export const AgentCommandService = ServiceMap.Service<{
   >;
 }>("AgentCommandService");
 
-export const AgentCommandServiceImpl = ServiceMap.make(AgentCommandService, {
-  resolveCommand: () =>
-    Effect.gen(function* () {
-      const globalConfig = yield* GlobalConfigService;
-      const command = yield* globalConfig.getCommand();
+export const AgentCommandServiceImpl = Layer.effect(
+  AgentCommandService,
+  Effect.gen(function* () {
+    const globalConfig = yield* GlobalConfigService;
 
-      if (typeof command === "string" && command.trim().length > 0) {
-        return command.trim();
-      }
+    return {
+      resolveCommand: () =>
+        Effect.gen(function* () {
+          const command = yield* globalConfig.getCommand();
 
-      if (!isInteractive()) {
-        return yield* Effect.fail(
-          new UnknownError(
-            undefined,
-            `Missing command in ${GLOBAL_CONFIG_PATH}. Add { "command": "opencode run" }`
-          )
-        );
-      }
+          if (typeof command === "string" && command.trim().length > 0) {
+            return command.trim();
+          }
 
-      const prompted = yield* promptForCommand;
+          if (!isInteractive()) {
+            return yield* Effect.fail(
+              new UnknownError(
+                undefined,
+                `Missing command in ${GLOBAL_CONFIG_PATH}. Add { "command": "opencode run" }`
+              )
+            );
+          }
 
-      if (prompted.length === 0) {
-        return yield* Effect.fail(
-          new UnknownError(undefined, "Command must not be empty")
-        );
-      }
+          const prompted = yield* promptForCommand;
 
-      yield* globalConfig.setCommand(prompted);
-      return prompted;
-    }).pipe(Effect.provide(GlobalConfigServiceImpl)),
-});
+          if (prompted.length === 0) {
+            return yield* Effect.fail(
+              new UnknownError(undefined, "Command must not be empty")
+            );
+          }
+
+          yield* globalConfig.setCommand(prompted);
+          return prompted;
+        }),
+    } satisfies typeof AgentCommandService.Service;
+  })
+);
