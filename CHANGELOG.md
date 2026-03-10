@@ -1,5 +1,11 @@
 # @skippercorp/skipper
 
+## 1.3.1
+
+### Patch Changes
+
+- 122c70e: Fix tmux session attach outside tmux by using an interactive spawn path, so `sk sw` no longer exits right after connect.
+
 ## 1.3.0
 
 ### Minor Changes
