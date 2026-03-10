@@ -10,9 +10,6 @@ type WorkflowRuntimePayload = {
   readonly input?: string;
 };
 
-const readText = async (stream: ReadableStream<Uint8Array> | null) =>
-  stream === null ? "" : await new Response(stream).text();
-
 const loadWorkflowModule = async (workflowPath: string): Promise<WorkflowModule> => {
   const module = await import(pathToFileURL(workflowPath).href);
   const workflow = module.default;
@@ -58,24 +55,20 @@ const runShell = async (
   command: string,
   options?: WorkflowShellOptions
 ) => {
-  const proc = Bun.spawn(["sh", "-lc", command], {
-    cwd,
-    stdin: options?.stdin === undefined ? "ignore" : "pipe",
-    stdout: "pipe",
-    stderr: "pipe",
-    env: process.env,
-  });
+  let shell = Bun.$`${{ raw: command }}`.cwd(cwd).env(process.env).quiet().nothrow();
 
-  if (options?.stdin !== undefined && proc.stdin !== undefined) {
-    proc.stdin.write(options.stdin);
-    proc.stdin.end();
+  if (options?.stdin !== undefined) {
+    shell = Bun.$`${{ raw: command }} < ${new Response(options.stdin)}`
+      .cwd(cwd)
+      .env(process.env)
+      .quiet()
+      .nothrow();
   }
 
-  const [stdout, stderr, exitCode] = await Promise.all([
-    readText(proc.stdout),
-    readText(proc.stderr),
-    proc.exited,
-  ]);
+  const result = await shell;
+  const stdout = result.stdout.toString();
+  const stderr = result.stderr.toString();
+  const exitCode = result.exitCode;
 
   if (exitCode !== 0) {
     throw new Error(

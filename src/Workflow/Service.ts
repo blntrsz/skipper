@@ -122,14 +122,19 @@ export const WorkflowServiceImpl = Layer.effect(
           input: Option.getOrUndefined(input.input),
         });
 
-        const proc = Bun.spawn(["bun", "run", "./src/Workflow/Runtime.ts", payload], {
-          cwd: process.cwd(),
-          stdin: "inherit",
-          stdout: "inherit",
-          stderr: "inherit",
-          env: process.env,
+        const result = yield* Effect.tryPromise({
+          try: () =>
+            Bun.$`${["bun", "run", "./src/Workflow/Runtime.ts", payload]}`
+              .cwd(process.cwd())
+              .env(process.env)
+              .nothrow(),
+          catch: (cause) =>
+            new WorkflowServiceError({
+              message: `Workflow '${definition.name}' failed to start`,
+              cause,
+            }),
         });
-        const exitCode = yield* Effect.promise(() => proc.exited);
+        const exitCode = result.exitCode;
 
         if (exitCode !== 0) {
           return yield* Effect.fail(

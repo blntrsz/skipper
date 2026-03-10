@@ -2,19 +2,22 @@ import { describe, expect, test } from "bun:test";
 import { Effect } from "effect";
 import { connectToTmuxSession } from "./TmuxService";
 
+type Invocation = {
+  args: ReadonlyArray<string>;
+  options: {
+    cwd?: string;
+    quiet?: boolean;
+  };
+  failureMessage: string;
+};
+
 describe("TmuxService", () => {
   test("attaches with inherited stdio outside tmux", async () => {
-    let invocation:
-      | {
-          args: ReadonlyArray<string>;
-          options: Record<string, string>;
-          failureMessage: string;
-        }
-      | undefined;
+    let invocation: Invocation | undefined;
 
     const runner = (
       args: ReadonlyArray<string>,
-      options: Record<string, string>,
+      options: Invocation["options"],
       failureMessage: string
     ) =>
       Effect.sync(() => {
@@ -29,26 +32,17 @@ describe("TmuxService", () => {
       args: ["attach-session", "-t", "skipper-main"],
       options: {
         cwd: "/tmp/skipper",
-        stdin: "inherit",
-        stdout: "inherit",
-        stderr: "inherit",
       },
       failureMessage: "Failed to attach tmux session 'skipper-main'",
     });
   });
 
   test("switches client inside tmux", async () => {
-    let invocation:
-      | {
-          args: ReadonlyArray<string>;
-          options: Record<string, string>;
-          failureMessage: string;
-        }
-      | undefined;
+    let invocation: Invocation | undefined;
 
     const runner = (
       args: ReadonlyArray<string>,
-      options: Record<string, string>,
+      options: Invocation["options"],
       failureMessage: string
     ) =>
       Effect.sync(() => {

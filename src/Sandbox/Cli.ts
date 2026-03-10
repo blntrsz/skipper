@@ -1,12 +1,12 @@
 import { Effect, FileSystem, Layer, ServiceMap } from "effect";
 import { Argument, Command, Flag } from "effect/unstable/cli";
-import { ChildProcess } from "effect/unstable/process";
 import { SandboxService } from "./Port";
 import type { SandboxConfig } from "../domain/Sandbox";
 import { GitRepositoryOption } from "../domain/GitRepository";
 import { SandboxServiceImpl } from "./Service";
 import * as RepositoryPath from "../domain/RepositoryPath";
 import type { Option } from "effect";
+import { systemError } from "effect/PlatformError";
 import { SwitchService } from "@/internal/SwitchService";
 import { SwitchServiceImpl } from "@/internal/SwitchService";
 import { PickerCancelled } from "@/internal/InteractivePicker";
@@ -78,19 +78,33 @@ export const cloneCommand = Command.make(
     ),
   },
   (input) =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem;
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
 
-        yield* fs.makeDirectory(RepositoryPath.root(), { recursive: true });
+      yield* fs.makeDirectory(RepositoryPath.root(), { recursive: true });
 
-        const handle = yield* ChildProcess.make({
-          cwd: RepositoryPath.root(),
-        })`gh repo clone ${input.repository}`;
+      yield* Effect.tryPromise({
+        try: async () => {
+          const result = await Bun.$`${["gh", "repo", "clone", input.repository]}`
+            .cwd(RepositoryPath.root())
+            .env(process.env)
+            .nothrow();
 
-        yield* handle.exitCode;
-      })
-    )
+          if (result.exitCode !== 0) {
+            throw new Error(result.stderr.toString().trim() || "gh repo clone failed");
+          }
+        },
+        catch: (cause) =>
+          systemError({
+            _tag: "Unknown",
+            module: "SandboxCli",
+            method: "cloneCommand",
+            description: `Failed to clone repository '${input.repository}'`,
+            pathOrDescriptor: RepositoryPath.root(),
+            cause,
+          }),
+      });
+    })
 ).pipe(
   Command.withAlias("c"),
   Command.withDescription("Clone repository into local repository root")

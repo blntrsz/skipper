@@ -1,7 +1,6 @@
 import { Effect, FileSystem, Option, ServiceMap } from "effect";
 import { UnknownError } from "effect/Cause";
-import type { PlatformError } from "effect/PlatformError";
-import { ChildProcess } from "effect/unstable/process";
+import { type PlatformError, systemError } from "effect/PlatformError";
 import type { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
 import { GitRepository, type GitRepositoryOption } from "@/domain/GitRepository";
 import * as RepositoryPath from "@/domain/RepositoryPath";
@@ -37,15 +36,27 @@ export const GitServiceImpl = ServiceMap.make(GitService, {
     repositoryPath: RepositoryPathType,
     workTreePath: WorkTreePath
   ) =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const handle = yield* ChildProcess.make({
-          cwd: repositoryPath,
-        })`git worktree add ${workTreePath}`;
+    Effect.tryPromise({
+      try: async () => {
+        const result = await Bun.$`${["git", "worktree", "add", workTreePath]}`
+          .cwd(repositoryPath)
+          .env(process.env)
+          .nothrow();
 
-        yield* handle.exitCode;
-      })
-    ),
+        if (result.exitCode !== 0) {
+          throw new Error(result.stderr.toString().trim() || "git worktree add failed");
+        }
+      },
+      catch: (cause) =>
+        systemError({
+          _tag: "Unknown",
+          module: "GitService",
+          method: "createWorkTree",
+          description: `Failed to create worktree '${workTreePath}'`,
+          pathOrDescriptor: repositoryPath,
+          cause,
+        }),
+    }),
   resolveGitRepository: (git: GitRepositoryOption) =>
     Effect.gen(function* () {
       if (Option.isNone(git.repository)) {
@@ -95,13 +106,25 @@ export const GitServiceImpl = ServiceMap.make(GitService, {
     repositoryPath: RepositoryPathType,
     workTreePath: WorkTreePath
   ) =>
-    Effect.scoped(
-      Effect.gen(function* () {
-        const handle = yield* ChildProcess.make({
-          cwd: repositoryPath,
-        })`git worktree remove ${workTreePath}`;
+    Effect.tryPromise({
+      try: async () => {
+        const result = await Bun.$`${["git", "worktree", "remove", workTreePath]}`
+          .cwd(repositoryPath)
+          .env(process.env)
+          .nothrow();
 
-        yield* handle.exitCode;
-      })
-    ),
+        if (result.exitCode !== 0) {
+          throw new Error(result.stderr.toString().trim() || "git worktree remove failed");
+        }
+      },
+      catch: (cause) =>
+        systemError({
+          _tag: "Unknown",
+          module: "GitService",
+          method: "removeWorkTree",
+          description: `Failed to remove worktree '${workTreePath}'`,
+          pathOrDescriptor: repositoryPath,
+          cause,
+        }),
+    }),
 });

@@ -1,7 +1,6 @@
 import { Effect, FileSystem } from "effect";
-import type { PlatformError } from "effect/PlatformError";
+import { type PlatformError, systemError } from "effect/PlatformError";
 import { UnknownError } from "effect/Cause";
-import { ChildProcess } from "effect/unstable/process";
 import type { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
 import type { DockerSandboxDefinition } from "@/domain/DockerSandboxDefinition";
 import type { GitRepository } from "@/domain/GitRepository";
@@ -70,26 +69,28 @@ const ensureSourcePath = (gitRepository: GitRepository) =>
 const runDockerCommand = (
   args: readonly string[]
 ): Effect.Effect<void, PlatformError, ChildProcessSpawner> =>
-  Effect.scoped(
-    Effect.gen(function* () {
-      const handle = yield* ChildProcess.make("docker", args, {
-        stdin: "inherit",
-        stdout: "inherit",
-        stderr: "inherit",
-      });
+  Effect.tryPromise({
+    try: async () => {
+      const result = await Bun.$`${["docker", ...args]}`.env(process.env).nothrow();
 
-      yield* handle.exitCode;
-    })
-  );
+      if (result.exitCode !== 0) {
+        throw new Error(result.stderr.toString().trim() || "docker command failed");
+      }
+    },
+    catch: (cause) =>
+      systemError({
+        _tag: "Unknown",
+        module: "DockerSandboxService",
+        method: "runDockerCommand",
+        description: `Failed to run docker ${args.join(" ")}`,
+        cause,
+      }),
+  });
 
 const removeContainerIfExists = (containerName: string) =>
   Effect.tryPromise({
     try: async () => {
-      const proc = Bun.spawn(["docker", "rm", "-f", containerName], {
-        stdout: "ignore",
-        stderr: "ignore",
-      });
-      await proc.exited;
+      await Bun.$`${["docker", "rm", "-f", containerName]}`.quiet().nothrow();
     },
     catch: (error) =>
       new UnknownError(error, `Failed to remove container '${containerName}'`),

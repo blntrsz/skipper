@@ -8,37 +8,25 @@ type AgentProcessResult = {
   readonly exitCode: number;
 };
 
-export const splitCommand = (command: string): ReadonlyArray<string> =>
-  command
-    .trim()
-    .split(/\s+/)
-    .filter((part) => part.length > 0);
-
 const ensureCommand = (command: string) => {
-  const parts = splitCommand(command);
+  const trimmed = command.trim();
 
-  if (parts[0] === undefined) {
+  if (trimmed.length === 0) {
     throw new Error("Command must not be empty");
   }
 
-  return parts;
+  return trimmed;
 };
-
-const readText = async (stream: ReadableStream<Uint8Array> | null) =>
-  stream === null ? "" : await new Response(stream).text();
 
 export const runAgentCommand = (command: string, cwd: string, prompt: string) =>
   Effect.tryPromise({
     try: async () => {
-      const parts = ensureCommand(command);
-      const proc = Bun.spawn([...parts, prompt], {
-        cwd,
-        stdin: "inherit",
-        stdout: "inherit",
-        stderr: "inherit",
-        env: process.env,
-      });
-      const exitCode = await proc.exited;
+      const ensuredCommand = ensureCommand(command);
+      const result = await Bun.$`${{ raw: ensuredCommand }} ${prompt}`
+        .cwd(cwd)
+        .env(process.env)
+        .nothrow();
+      const exitCode = result.exitCode;
 
       if (exitCode !== 0) {
         throw new Error(`Command failed with exit code ${exitCode}`);
@@ -58,19 +46,15 @@ export const captureAgentCommand = (
 ) =>
   Effect.tryPromise({
     try: async (): Promise<AgentProcessResult> => {
-      const parts = ensureCommand(command);
-      const proc = Bun.spawn([...parts, prompt], {
-        cwd,
-        stdin: "ignore",
-        stdout: "pipe",
-        stderr: "pipe",
-        env: process.env,
-      });
-      const [stdout, stderr, exitCode] = await Promise.all([
-        readText(proc.stdout),
-        readText(proc.stderr),
-        proc.exited,
-      ]);
+      const ensuredCommand = ensureCommand(command);
+      const result = await Bun.$`${{ raw: ensuredCommand }} ${prompt}`
+        .cwd(cwd)
+        .env(process.env)
+        .quiet()
+        .nothrow();
+      const stdout = result.stdout.toString();
+      const stderr = result.stderr.toString();
+      const exitCode = result.exitCode;
 
       if (exitCode !== 0) {
         throw new Error(
