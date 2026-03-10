@@ -122,6 +122,34 @@ export default async function issueTriage(context, { issueNumber }) {
 }
 ```
 
+Example code-review workflow for current local changes:
+
+```ts
+export default async function codeReviewWorkflow(context) {
+  const diff = await context.shell(
+    "git diff --cached --no-ext-diff && git diff --no-ext-diff"
+  );
+
+  if (diff.stdout.trim().length === 0) {
+    process.stdout.write("No local changes to review.\n");
+    return;
+  }
+
+  const review = await context.prompt(
+    [
+      "Review these local git changes. Staged diff comes first, then unstaged diff.",
+      "Only report major or minor issues: correctness, regressions, security, reliability, and meaningful test gaps.",
+      "Ignore style-only feedback and nitpicks.",
+      "Keep feedback concise and actionable.",
+      "",
+      diff.stdout,
+    ].join("\n")
+  );
+
+  process.stdout.write(`${review.trim()}\n`);
+}
+```
+
 Optional input:
 
 ```bash
