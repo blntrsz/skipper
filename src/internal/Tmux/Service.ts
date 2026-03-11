@@ -1,20 +1,8 @@
-import { Config, Effect, ServiceMap } from "effect";
+import { Effect, ServiceMap } from "effect";
 import * as Shell from "../Shell";
+import { Tmux } from "./TmuxService";
 
-export const TmuxService = ServiceMap.Service<{
-  attachSession: (
-    sessionName: string,
-    path: string
-  ) => Effect.Effect<void, Shell.ShellError, typeof Shell.Shell.Service>;
-}>("TmuxService");
-
-export const tmuxConfig = Config.make((provider) =>
-  Effect.all({
-    tmux: Config.string("TMUX").parse(provider),
-  })
-);
-
-export const TmuxServiceImpl = ServiceMap.make(TmuxService, {
+export const TmuxService = ServiceMap.make(Tmux, {
   attachSession: (sessionName: string, path: string) =>
     Effect.scoped(
       Effect.gen(function* () {

@@ -9,11 +9,16 @@ import type { GitRepository } from "@/domain/GitRepository";
 import { GitRepository as GitRepositorySchema } from "@/domain/GitRepository";
 import { resolveWorkspacePath } from "@/domain/WorkspacePath";
 import * as WorkTreePath from "@/domain/WorkTreePath";
-import { Picker, PickerCancelled, PickerError, PickerNoMatch } from "@/internal/Picker/Service";
+import {
+  Picker,
+  PickerCancelled,
+  PickerError,
+  PickerNoMatch,
+} from "@/internal/Picker/Service";
 import { sanitizeNameSegment } from "@/internal/SkipperPaths";
 import * as Shell from "@/internal/Shell";
-import { TmuxService } from "@/internal/Tmux";
-import { GitService } from "@/internal/GitService";
+import { Tmux } from "@/internal";
+import { Git } from "@/internal";
 
 const isInteractive = () =>
   process.stdin.isTTY === true &&
@@ -212,7 +217,10 @@ const ensureInteractive = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
 
 const promptForBranchName = Effect.tryPromise({
   try: async () => {
-    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    const rl = createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
     try {
       return (await rl.question("Branch name: ")).trim();
     } finally {
@@ -272,9 +280,9 @@ export const SwitchService = ServiceMap.Service<{
 export const SwitchServiceImpl = Layer.effect(
   SwitchService,
   Effect.gen(function* () {
-    const tmux = yield* TmuxService;
+    const tmux = yield* Tmux.Tmux;
     const picker = yield* Picker;
-    const git = yield* GitService;
+    const git = yield* Git.Git;
 
     const run: (typeof SwitchService.Service)["run"] = (input) =>
       Effect.gen(function* () {
@@ -312,13 +320,18 @@ export const SwitchServiceImpl = Layer.effect(
 
           const repositoryPath = RepositoryPath.make(repository);
           const workTreePath = WorkTreePath.make({ repository, branch });
-          const workTreeRepositoryPath = WorkTreePath.makeRepositoryPath({ repository, branch });
+          const workTreeRepositoryPath = WorkTreePath.makeRepositoryPath({
+            repository,
+            branch,
+          });
 
           const fs = yield* FileSystem.FileSystem;
           const isWorkTreeExists = yield* fs.exists(workTreePath);
 
           if (!isWorkTreeExists) {
-            yield* fs.makeDirectory(workTreeRepositoryPath, { recursive: true });
+            yield* fs.makeDirectory(workTreeRepositoryPath, {
+              recursive: true,
+            });
             yield* git.createWorkTree(
               repositoryPath,
               workTreePath,
@@ -327,7 +340,10 @@ export const SwitchServiceImpl = Layer.effect(
           }
 
           const targetPath = resolveTargetPath(repository, branch);
-          yield* tmux.attachSession(makeSessionName(repository, branch), targetPath);
+          yield* tmux.attachSession(
+            makeSessionName(repository, branch),
+            targetPath
+          );
           return;
         }
 

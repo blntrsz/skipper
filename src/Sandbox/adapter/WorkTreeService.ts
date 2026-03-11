@@ -2,7 +2,7 @@ import { Effect, FileSystem } from "effect";
 import * as RepositoryPath from "@/domain/RepositoryPath";
 import * as WorkTreePath from "@/domain/WorkTreePath";
 import { GitRepository } from "@/domain/GitRepository";
-import { GitService } from "@/internal/GitService";
+import { Git } from "@/internal";
 
 export const create = (config: GitRepository) =>
   Effect.gen(function* () {
@@ -12,7 +12,7 @@ export const create = (config: GitRepository) =>
     }
 
     const fs = yield* FileSystem.FileSystem;
-    const git = yield* GitService;
+    const git = yield* Git.Git;
     const repositoryPath = RepositoryPath.make(config.repository);
     const workTreeRepositoryPath = WorkTreePath.makeRepositoryPath(config);
     const gitRepository = GitRepository.makeUnsafe({
@@ -37,7 +37,7 @@ export const remove = (config: GitRepository) =>
     }
 
     const fs = yield* FileSystem.FileSystem;
-    const git = yield* GitService;
+    const git = yield* Git.Git;
     const repositoryPath = RepositoryPath.make(config.repository);
     const workTreePath = WorkTreePath.make(config);
     const isWorkTreeExists = yield* fs.exists(workTreePath);

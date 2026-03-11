@@ -6,16 +6,6 @@ export const TmuxWorkTreeSandboxConfig = Schema.Struct({
 
 export type TmuxWorkTreeSandboxConfig = typeof TmuxWorkTreeSandboxConfig.Type;
 
-export const DockerSandboxConfig = Schema.Struct({
-  type: Schema.Literal("docker"),
-  sandbox: Schema.Option(Schema.String),
-});
-
-export type DockerSandboxConfig = typeof DockerSandboxConfig.Type;
-
-export const SandboxConfig = Schema.Union([
-  TmuxWorkTreeSandboxConfig,
-  DockerSandboxConfig,
-]);
+export const SandboxConfig = TmuxWorkTreeSandboxConfig;
 
 export type SandboxConfig = typeof SandboxConfig.Type;

@@ -2,19 +2,14 @@ import { Effect } from "effect";
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { CliError, Command } from "effect/unstable/cli";
 import packageJson from "../package.json";
-import { cloneCommand, sandboxCommand, switchCommand } from "./Sandbox/Cli";
+import { cloneCommand, sandboxCommand } from "./Sandbox/Cli";
 import { TaskCli } from "./Task/Cli";
-import { runCommand } from "./Agent/Cli";
-import { workflowCommand } from "./Workflow/Cli";
 import { BunShell } from "./internal/Shell";
 
 const command = Command.make("skipper").pipe(
   Command.withSubcommands([
     cloneCommand,
-    switchCommand,
     sandboxCommand,
-    runCommand,
-    workflowCommand,
     TaskCli,
   ])
 );

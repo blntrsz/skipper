@@ -1,58 +1,29 @@
 import { Effect, FileSystem, Layer, ServiceMap } from "effect";
 import { Argument, Command, Flag } from "effect/unstable/cli";
-import { SandboxService } from "./Port";
-import type { SandboxConfig } from "../domain/Sandbox";
+import { SandboxService } from "./Service";
 import { GitRepositoryOption } from "../domain/GitRepository";
-import { SandboxServiceImpl } from "./Service";
+import { SandboxServiceImpl } from "./SandboxService";
 import * as RepositoryPath from "../domain/RepositoryPath";
-import type { Option } from "effect";
 import { systemError } from "effect/PlatformError";
-import { SwitchService } from "@/internal/SwitchService";
+import { SwitchService, SwitchServiceImpl } from "./SwitchService";
 import { PickerCancelled, PickerNoMatch } from "@/internal/Picker/Service";
 import { TerminalPicker } from "@/internal/Picker/TerminalService";
-import { GitServiceImpl } from "@/internal/GitService";
-import { SandboxDefinitionServiceImpl } from "@/internal/SandboxDefinitionService";
-import { SwitchServiceImpl } from "@/internal/SwitchService";
-import { TmuxServiceImpl } from "@/internal/Tmux";
-
-type SandboxCommandConfig = {
-  readonly type: "tmux-worktree" | "docker";
-  readonly sandbox: Option.Option<string>;
-};
-
-const toSandboxConfig = (config: SandboxCommandConfig): SandboxConfig => {
-  switch (config.type) {
-    case "docker":
-      return {
-        type: "docker",
-        sandbox: config.sandbox,
-      };
-    case "tmux-worktree":
-    default:
-      return { type: "tmux-worktree" };
-  }
-};
+import { Git } from "@/internal";
+import { TmuxService } from "@/internal/Tmux";
 
 const sandboxLayer = SandboxServiceImpl.pipe(
+  Layer.provide(Layer.succeedServices(ServiceMap.mergeAll(Git.GitService)))
+);
+
+const switchLayer = SwitchServiceImpl.pipe(
   Layer.provide(
     Layer.succeedServices(
-      ServiceMap.mergeAll(GitServiceImpl, SandboxDefinitionServiceImpl)
+      ServiceMap.mergeAll(TmuxService, TerminalPicker, Git.GitService)
     )
   )
 );
 
-const switchLayer = SwitchServiceImpl.pipe(
-  Layer.provide(Layer.succeedServices(ServiceMap.mergeAll(TmuxServiceImpl, TerminalPicker, GitServiceImpl)))
-);
-
 const flags = {
-  type: Flag.choice("type", ["tmux-worktree", "docker"]).pipe(
-    Flag.withDefault("tmux-worktree"),
-    Flag.withDescription("Sandbox backend type")
-  ),
-  sandbox: Flag.optional(
-    Flag.string("sandbox").pipe(Flag.withDescription("Sandbox name"))
-  ),
   git: {
     repository: Flag.optional(
       Flag.string("repository").pipe(
@@ -121,7 +92,7 @@ export const addCommand = Command.make("add", flags, (config) =>
     const service = yield* SandboxService;
 
     yield* service.create(
-      toSandboxConfig(config),
+      { type: "tmux-worktree" },
       GitRepositoryOption.makeUnsafe(config.git)
     );
   }).pipe(Effect.provide(sandboxLayer))
@@ -132,7 +103,7 @@ export const removeCommand = Command.make("remove", flags, (config) =>
     const service = yield* SandboxService;
 
     yield* service.remove(
-      toSandboxConfig(config),
+      { type: "tmux-worktree" },
       GitRepositoryOption.makeUnsafe(config.git)
     );
   }).pipe(Effect.provide(sandboxLayer))
@@ -141,7 +112,7 @@ export const removeCommand = Command.make("remove", flags, (config) =>
   Command.withDescription("Remove sandbox resources")
 );
 
-export const switchCommand = Command.make(
+const switchCommand = Command.make(
   "switch",
   {
     repository: flags.git.repository,
@@ -171,5 +142,5 @@ export const switchCommand = Command.make(
 export const sandboxCommand = Command.make("sandbox").pipe(
   Command.withAlias("s"),
   Command.withDescription("Manage sandboxes"),
-  Command.withSubcommands([addCommand, removeCommand])
+  Command.withSubcommands([addCommand, removeCommand, switchCommand])
 );
