@@ -1,5 +1,15 @@
 # @skippercorp/skipper
 
+## 1.4.0
+
+### Minor Changes
+
+- f5aa831: `switch --create`: prompt for repository then text input for new branch name, creates worktree and switches tmux
+
+### Patch Changes
+
+- 8336af0: Consolidate services and remove legacy modules (Agent, Workflow, DockerSandbox); reorganize Git and Tmux internals.
+
 ## 1.3.2
 
 ### Patch Changes
