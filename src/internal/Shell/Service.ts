@@ -22,4 +22,11 @@ export const Shell = ServiceMap.Service<{
     command: string;
     errorMessage: string;
   }) => Effect.Effect<string, ShellError, never>;
+  exec: ({
+    command,
+    errorMessage,
+  }: {
+    command: string[];
+    errorMessage: string;
+  }) => Effect.Effect<void, ShellError, never>;
 }>("Shell");

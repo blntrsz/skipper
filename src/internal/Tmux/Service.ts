@@ -7,7 +7,7 @@ export const TmuxService = ServiceMap.make(Tmux, {
     Effect.scoped(
       Effect.gen(function* () {
         const isInTmuxSession = !!process.env.TMUX;
-        const { $, bool } = yield* Shell.Shell;
+        const { $, bool, exec } = yield* Shell.Shell;
 
         const isTmuxRunning = yield* $({
           command: "pgrep tmux",
@@ -33,13 +33,13 @@ export const TmuxService = ServiceMap.make(Tmux, {
         }
 
         if (isInTmuxSession) {
-          yield* $({
-            command: `tmux switch-client -t ${sessionName}`,
+          yield* exec({
+            command: ["tmux", "switch-client", "-t", sessionName],
             errorMessage: `Failed to switch tmux session '${sessionName}'`,
           });
         } else {
-          yield* $({
-            command: `tmux attach-session -t ${sessionName}`,
+          yield* exec({
+            command: ["tmux", "attach-session", "-t", sessionName],
             errorMessage: `Failed to attach to tmux session '${sessionName}'`,
           });
         }
