@@ -1,5 +1,12 @@
 # @skippercorp/skipper
 
+## 1.3.2
+
+### Patch Changes
+
+- 15aa075: Refactor shell execution to use `Bun.$` across agent, workflow, tmux, git, docker, and clone flows, keeping error handling consistent while removing direct spawn usage.
+- fa5020a: refactor: extract Shell/Tmux into modules, pass branch to git worktree add
+
 ## 1.3.1
 
 ### Patch Changes
