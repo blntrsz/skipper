@@ -1,6 +1,5 @@
 import { Effect, Layer } from "effect";
 import { SandboxService } from "./Port";
-import type { SandboxConfig } from "../domain/Sandbox";
 import * as WorkTreeSandbox from "./adapter/WorkTreeService";
 import { GitService } from "../internal/GitService";
 import * as DockerSandbox from "./adapter/DockerSandboxService";
@@ -73,7 +72,9 @@ export const SandboxServiceImpl = Layer.effect(
         }
 
         yield* Effect.logInfo(
-          config.type === "docker" ? "Docker sandbox removed" : "Workflow removed"
+          config.type === "docker"
+            ? "Docker sandbox removed"
+            : "Workflow removed"
         );
       });
 

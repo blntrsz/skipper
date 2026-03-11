@@ -2,7 +2,10 @@ import { Effect, FileSystem, Option, ServiceMap } from "effect";
 import { UnknownError } from "effect/Cause";
 import { type PlatformError, systemError } from "effect/PlatformError";
 import type { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
-import { GitRepository, type GitRepositoryOption } from "@/domain/GitRepository";
+import {
+  GitRepository,
+  type GitRepositoryOption,
+} from "@/domain/GitRepository";
 import * as RepositoryPath from "@/domain/RepositoryPath";
 import type { RepositoryPath as RepositoryPathType } from "@/domain/RepositoryPath";
 import type { WorkTreePath } from "@/domain/WorkTreePath";
@@ -10,7 +13,8 @@ import type { WorkTreePath } from "@/domain/WorkTreePath";
 export const GitService = ServiceMap.Service<{
   createWorkTree: (
     repositoryPath: RepositoryPathType,
-    workTreePath: WorkTreePath
+    workTreePath: WorkTreePath,
+    git: GitRepository
   ) => Effect.Effect<void, PlatformError, ChildProcessSpawner>;
   removeWorkTree: (
     repositoryPath: RepositoryPathType,
@@ -28,23 +32,37 @@ export const GitService = ServiceMap.Service<{
   ) => Effect.Effect<string, UnknownError, never>;
   ensureRepositoryExists: (
     repository: string
-  ) => Effect.Effect<string, PlatformError | UnknownError, FileSystem.FileSystem>;
+  ) => Effect.Effect<
+    string,
+    PlatformError | UnknownError,
+    FileSystem.FileSystem
+  >;
 }>("GitService");
 
 export const GitServiceImpl = ServiceMap.make(GitService, {
   createWorkTree: (
     repositoryPath: RepositoryPathType,
-    workTreePath: WorkTreePath
+    workTreePath: WorkTreePath,
+    git: GitRepository
   ) =>
     Effect.tryPromise({
       try: async () => {
-        const result = await Bun.$`${["git", "worktree", "add", workTreePath]}`
+        const result = await Bun.$`${[
+          "git",
+          "worktree",
+          "add",
+          workTreePath,
+          "-b",
+          git.branch,
+        ]}`
           .cwd(repositoryPath)
           .env(process.env)
           .nothrow();
 
         if (result.exitCode !== 0) {
-          throw new Error(result.stderr.toString().trim() || "git worktree add failed");
+          throw new Error(
+            result.stderr.toString().trim() || "git worktree add failed"
+          );
         }
       },
       catch: (cause) =>
@@ -108,13 +126,20 @@ export const GitServiceImpl = ServiceMap.make(GitService, {
   ) =>
     Effect.tryPromise({
       try: async () => {
-        const result = await Bun.$`${["git", "worktree", "remove", workTreePath]}`
+        const result = await Bun.$`${[
+          "git",
+          "worktree",
+          "remove",
+          workTreePath,
+        ]}`
           .cwd(repositoryPath)
           .env(process.env)
           .nothrow();
 
         if (result.exitCode !== 0) {
-          throw new Error(result.stderr.toString().trim() || "git worktree remove failed");
+          throw new Error(
+            result.stderr.toString().trim() || "git worktree remove failed"
+          );
         }
       },
       catch: (cause) =>

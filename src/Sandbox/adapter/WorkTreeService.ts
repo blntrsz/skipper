@@ -1,7 +1,7 @@
 import { Effect, FileSystem } from "effect";
 import * as RepositoryPath from "@/domain/RepositoryPath";
 import * as WorkTreePath from "@/domain/WorkTreePath";
-import type { GitRepository } from "@/domain/GitRepository";
+import { GitRepository } from "@/domain/GitRepository";
 import { GitService } from "@/internal/GitService";
 
 export const create = (config: GitRepository) =>
@@ -15,6 +15,10 @@ export const create = (config: GitRepository) =>
     const git = yield* GitService;
     const repositoryPath = RepositoryPath.make(config.repository);
     const workTreeRepositoryPath = WorkTreePath.makeRepositoryPath(config);
+    const gitRepository = GitRepository.makeUnsafe({
+      repository: config.repository,
+      branch: config.branch,
+    });
     const workTreePath = WorkTreePath.make(config);
     const isWorkTreeExists = yield* fs.exists(workTreePath);
 
@@ -23,7 +27,7 @@ export const create = (config: GitRepository) =>
     }
 
     yield* fs.makeDirectory(workTreeRepositoryPath, { recursive: true });
-    yield* git.createWorkTree(repositoryPath, workTreePath);
+    yield* git.createWorkTree(repositoryPath, workTreePath, gitRepository);
   });
 
 export const remove = (config: GitRepository) =>

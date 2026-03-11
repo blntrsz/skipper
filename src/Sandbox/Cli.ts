@@ -8,11 +8,11 @@ import * as RepositoryPath from "../domain/RepositoryPath";
 import type { Option } from "effect";
 import { systemError } from "effect/PlatformError";
 import { SwitchService } from "@/internal/SwitchService";
-import { SwitchServiceImpl } from "@/internal/SwitchService";
 import { PickerCancelled } from "@/internal/InteractivePicker";
 import { GitServiceImpl } from "@/internal/GitService";
 import { SandboxDefinitionServiceImpl } from "@/internal/SandboxDefinitionService";
-import { TmuxServiceImpl } from "@/internal/TmuxService";
+import { SwitchServiceImpl } from "@/internal/SwitchService";
+import { TmuxServiceImpl } from "@/internal/Tmux";
 
 type SandboxCommandConfig = {
   readonly type: "tmux-worktree" | "docker";
@@ -50,9 +50,7 @@ const flags = {
     Flag.withDescription("Sandbox backend type")
   ),
   sandbox: Flag.optional(
-    Flag.string("sandbox").pipe(
-      Flag.withDescription("Sandbox name")
-    )
+    Flag.string("sandbox").pipe(Flag.withDescription("Sandbox name"))
   ),
   git: {
     repository: Flag.optional(
@@ -85,13 +83,20 @@ export const cloneCommand = Command.make(
 
       yield* Effect.tryPromise({
         try: async () => {
-          const result = await Bun.$`${["gh", "repo", "clone", input.repository]}`
+          const result = await Bun.$`${[
+            "gh",
+            "repo",
+            "clone",
+            input.repository,
+          ]}`
             .cwd(RepositoryPath.root())
             .env(process.env)
             .nothrow();
 
           if (result.exitCode !== 0) {
-            throw new Error(result.stderr.toString().trim() || "gh repo clone failed");
+            throw new Error(
+              result.stderr.toString().trim() || "gh repo clone failed"
+            );
           }
         },
         catch: (cause) =>

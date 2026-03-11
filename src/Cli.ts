@@ -1,4 +1,4 @@
-import { Effect, Logger } from "effect";
+import { Effect } from "effect";
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { CliError, Command } from "effect/unstable/cli";
 import packageJson from "../package.json";
@@ -6,6 +6,7 @@ import { cloneCommand, sandboxCommand, switchCommand } from "./Sandbox/Cli";
 import { TaskCli } from "./Task/Cli";
 import { runCommand } from "./Agent/Cli";
 import { workflowCommand } from "./Workflow/Cli";
+import { BunShell } from "./internal/Shell";
 
 const command = Command.make("skipper").pipe(
   Command.withSubcommands([
@@ -31,8 +32,4 @@ const cli = Effect.gen(function* () {
   )
 );
 
-cli.pipe(
-  Effect.provide(BunServices.layer),
-  Effect.provide(Logger.layer([Logger.consolePretty()])),
-  BunRuntime.runMain
-);
+BunRuntime.runMain(Effect.provide(Effect.provide(cli, BunServices.layer), BunShell));

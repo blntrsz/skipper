@@ -2,15 +2,14 @@ import { join } from "node:path";
 import { Effect, FileSystem, Layer, Option, ServiceMap } from "effect";
 import { UnknownError } from "effect/Cause";
 import type { PlatformError } from "effect/PlatformError";
-import type { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
 import * as RepositoryPath from "@/domain/RepositoryPath";
 import type { GitRepository } from "@/domain/GitRepository";
 import { resolveWorkspacePath } from "@/domain/WorkspacePath";
 import * as WorkTreePath from "@/domain/WorkTreePath";
 import { pickOne, PickerCancelled } from "@/internal/InteractivePicker";
 import { sanitizeNameSegment } from "@/internal/SkipperPaths";
-import { TmuxError } from "@/internal/TmuxError";
-import { TmuxService } from "@/internal/TmuxService";
+import * as Shell from "@/internal/Shell";
+import { TmuxService } from "@/internal/Tmux";
 
 const isInteractive = () =>
   process.stdin.isTTY === true &&
@@ -271,8 +270,8 @@ export const SwitchService = ServiceMap.Service<{
     readonly branch: Option.Option<string>;
   }) => Effect.Effect<
     void,
-    PlatformError | UnknownError | PickerCancelled | TmuxError,
-    ChildProcessSpawner | FileSystem.FileSystem
+    PlatformError | UnknownError | PickerCancelled | Shell.ShellError,
+    FileSystem.FileSystem | typeof Shell.Shell.Service
   >;
 }>("SwitchService");
 
