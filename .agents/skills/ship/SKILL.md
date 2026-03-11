@@ -27,7 +27,11 @@ Whenever we make a change, we should create a changeset, outlining the changes t
 bun changeset --empty
 ```
 
-then fill in the changeset what has been changed
+then fill in the changeset what has been changed. To verify that the changeset is correct, run the following command:
+
+```bash
+bun changeset status
+```
 
 ## Process
 
