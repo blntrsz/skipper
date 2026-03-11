@@ -1,5 +1,11 @@
 # @skippercorp/skipper
 
+## 1.4.1
+
+### Patch Changes
+
+- d8fdd39: fix tmux attach/switch in compiled binary by using inherited stdio
+
 ## 1.4.0
 
 ### Minor Changes
