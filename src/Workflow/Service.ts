@@ -2,7 +2,7 @@ import { Effect, FileSystem, Layer, Option, ServiceMap } from "effect";
 import { GitRepository } from "@/domain/GitRepository";
 import { resolveWorkspacePath } from "@/domain/WorkspacePath";
 import { listBranches, listRepositories } from "@/internal/SwitchService";
-import { PickerCancelled, pickOne } from "@/internal/InteractivePicker";
+import { Picker, PickerCancelled, PickerNoMatch } from "@/internal/Picker/Service";
 import { WorkflowDefinitionService } from "@/internal/WorkflowDefinitionService";
 import { WorkflowServiceError } from "./Error";
 import { WorkflowService } from "./Port";
@@ -18,7 +18,10 @@ const ensureInteractive = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
         })
       );
 
-const resolveRepository = (repository: Option.Option<string>) =>
+const resolveRepository = (
+  picker: (typeof Picker.Service),
+  repository: Option.Option<string>
+) =>
   Effect.gen(function* () {
     const repositories = yield* listRepositories();
 
@@ -41,14 +44,15 @@ const resolveRepository = (repository: Option.Option<string>) =>
     }
 
     return yield* ensureInteractive(
-      pickOne(
-        "Repository",
-        repositories.map((value) => ({ label: value, value }))
-      )
+      picker.pick({ message: "Repository", options: repositories })
     );
   });
 
-const resolveBranch = (repository: string, branch: Option.Option<string>) =>
+const resolveBranch = (
+  picker: (typeof Picker.Service),
+  repository: string,
+  branch: Option.Option<string>
+) =>
   Effect.gen(function* () {
     const branches = yield* listBranches(repository);
 
@@ -65,10 +69,7 @@ const resolveBranch = (repository: string, branch: Option.Option<string>) =>
     }
 
     return yield* ensureInteractive(
-      pickOne(
-        "Branch",
-        branches.map((value) => ({ label: value, value }))
-      )
+      picker.pick({ message: "Branch", options: [...branches] })
     );
   });
 
@@ -76,12 +77,13 @@ export const WorkflowServiceImpl = Layer.effect(
   WorkflowService,
   Effect.gen(function* () {
     const workflowDefinitions = yield* WorkflowDefinitionService;
+    const picker = yield* Picker;
 
     const run: WorkflowService["run"] = (input) =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
-        const repository = yield* resolveRepository(input.repository);
-        const branch = yield* resolveBranch(repository, input.branch);
+        const repository = yield* resolveRepository(picker, input.repository);
+        const branch = yield* resolveBranch(picker, repository, input.branch);
         const gitRepository = GitRepository.makeUnsafe({ repository, branch });
         const workspacePath = resolveWorkspacePath(gitRepository);
 
@@ -103,18 +105,23 @@ export const WorkflowServiceImpl = Layer.effect(
           );
         }
 
-        const definition = yield* ensureInteractive(
-          pickOne(
-            "Workflow",
-            workflows.map((workflow) => ({
-              label:
-                workflow.source === "repo"
-                  ? `${workflow.name} [repo]`
-                  : workflow.name,
-              value: workflow,
-            }))
-          )
+        const workflowLabel = (w: (typeof workflows)[number]) =>
+          w.source === "repo" ? `${w.name} [repo]` : w.name;
+        const workflowByLabel = new Map(workflows.map((w) => [workflowLabel(w), w]));
+
+        const selectedLabel = yield* ensureInteractive(
+          picker.pick({
+            message: "Workflow",
+            options: workflows.map(workflowLabel),
+          })
         );
+
+        const definition = workflowByLabel.get(selectedLabel);
+        if (!definition) {
+          return yield* Effect.fail(
+            new WorkflowServiceError({ message: `Workflow '${selectedLabel}' not found` })
+          );
+        }
 
         const payload = JSON.stringify({
           workflowPath: definition.path,
@@ -145,7 +152,8 @@ export const WorkflowServiceImpl = Layer.effect(
         }
       }).pipe(
         Effect.catchIf(
-          (error): error is PickerCancelled => error instanceof PickerCancelled,
+          (error): error is PickerCancelled | PickerNoMatch =>
+            error instanceof PickerCancelled || error instanceof PickerNoMatch,
           () => Effect.void
         )
       );

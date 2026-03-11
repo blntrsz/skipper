@@ -72,9 +72,7 @@ export const SandboxServiceImpl = Layer.effect(
         }
 
         yield* Effect.logInfo(
-          config.type === "docker"
-            ? "Docker sandbox removed"
-            : "Workflow removed"
+          `Sandbox removed for ${gitRepository.repository} (${config.type})`
         );
       });
 

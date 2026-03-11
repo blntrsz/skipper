@@ -1,16 +1,11 @@
 import { Config, Effect, ServiceMap } from "effect";
 import * as Shell from "../Shell";
-import type { ConfigError } from "effect/Config";
 
 export const TmuxService = ServiceMap.Service<{
   attachSession: (
     sessionName: string,
     path: string
-  ) => Effect.Effect<
-    void,
-    Shell.ShellError | ConfigError,
-    typeof Shell.Shell.Service
-  >;
+  ) => Effect.Effect<void, Shell.ShellError, typeof Shell.Shell.Service>;
 }>("TmuxService");
 
 export const tmuxConfig = Config.make((provider) =>

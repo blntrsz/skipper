@@ -8,7 +8,8 @@ import * as RepositoryPath from "../domain/RepositoryPath";
 import type { Option } from "effect";
 import { systemError } from "effect/PlatformError";
 import { SwitchService } from "@/internal/SwitchService";
-import { PickerCancelled } from "@/internal/InteractivePicker";
+import { PickerCancelled, PickerNoMatch } from "@/internal/Picker/Service";
+import { TerminalPicker } from "@/internal/Picker/TerminalService";
 import { GitServiceImpl } from "@/internal/GitService";
 import { SandboxDefinitionServiceImpl } from "@/internal/SandboxDefinitionService";
 import { SwitchServiceImpl } from "@/internal/SwitchService";
@@ -41,7 +42,7 @@ const sandboxLayer = SandboxServiceImpl.pipe(
 );
 
 const switchLayer = SwitchServiceImpl.pipe(
-  Layer.provide(Layer.succeedServices(ServiceMap.mergeAll(TmuxServiceImpl)))
+  Layer.provide(Layer.succeedServices(ServiceMap.mergeAll(TmuxServiceImpl, TerminalPicker, GitServiceImpl)))
 );
 
 const flags = {
@@ -145,6 +146,9 @@ export const switchCommand = Command.make(
   {
     repository: flags.git.repository,
     branch: flags.git.branch,
+    create: Flag.boolean("create").pipe(
+      Flag.withDescription("Create new branch and switch")
+    ),
   },
   (input) =>
     Effect.gen(function* () {
@@ -153,7 +157,8 @@ export const switchCommand = Command.make(
       yield* service.run(input);
     }).pipe(
       Effect.catchIf(
-        (error): error is PickerCancelled => error instanceof PickerCancelled,
+        (error): error is PickerCancelled | PickerNoMatch =>
+          error instanceof PickerCancelled || error instanceof PickerNoMatch,
         () => Effect.void
       ),
       Effect.provide(switchLayer)

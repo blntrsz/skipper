@@ -3,10 +3,11 @@ import { Command, Flag } from "effect/unstable/cli";
 import { WorkflowService } from "./Port";
 import { WorkflowServiceImpl } from "./Service";
 import { WorkflowDefinitionServiceImpl } from "@/internal/WorkflowDefinitionService";
+import { TerminalPicker } from "@/internal/Picker/TerminalService";
 
 const workflowLayer = WorkflowServiceImpl.pipe(
   Layer.provide(
-    Layer.succeedServices(ServiceMap.mergeAll(WorkflowDefinitionServiceImpl))
+    Layer.succeedServices(ServiceMap.mergeAll(WorkflowDefinitionServiceImpl, TerminalPicker))
   )
 );
 
