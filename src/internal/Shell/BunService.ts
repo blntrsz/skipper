@@ -36,10 +36,14 @@ export const BunShell = ServiceMap.make(Shell, {
   exec: ({ command, errorMessage }) => {
     return Effect.try({
       try: () => {
+        process.stderr.write(`[exec:debug] spawnSync: ${command.join(" ")}\n`);
         const result = spawnSync(command[0]!, command.slice(1), {
           env: process.env,
           stdio: "inherit",
         });
+        process.stderr.write(
+          `[exec:debug] status=${result.status} signal=${result.signal ?? "(none)"} error=${result.error?.message ?? "(none)"}\n`
+        );
         if (result.status !== 0) {
           throw new ShellError({ message: errorMessage });
         }
