@@ -1,7 +1,7 @@
 import { Effect, ServiceMap } from "effect";
-import * as Task from "../domain/Task";
+import { Task } from "@/domain";
 import { TaskRepository } from "./Repository";
-import { TaskService } from "./Port";
+import { TaskService } from "./TaskService";
 
 const create: TaskService["create"] = (data) =>
   Effect.gen(function* () {
@@ -52,7 +52,7 @@ const del: TaskService["delete"] = (id) =>
     yield* repository.delete(id);
   });
 
-export const TaskServiceImpl = ServiceMap.make(TaskService, {
+export const SqlTaskService = ServiceMap.make(TaskService, {
   create,
   get,
   getByRepository,

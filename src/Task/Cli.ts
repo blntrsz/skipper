@@ -2,8 +2,8 @@ import { Effect } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
 import * as Task from "../domain/Task";
 import { DatabaseLive, runMigrations } from "../internal/DatabaseService";
-import { TaskService } from "./Port";
-import { TaskServiceImpl } from "./Service";
+import { SqlTaskService } from "./SqlTaskService";
+import { TaskService } from "./TaskService";
 
 const taskStateChoices = [
   "stale",
@@ -27,7 +27,7 @@ const withTaskDependencies = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     yield* runMigrations;
 
     return yield* effect;
-  }).pipe(Effect.provide(TaskServiceImpl), Effect.provide(DatabaseLive));
+  }).pipe(Effect.provide(SqlTaskService), Effect.provide(DatabaseLive));
 
 const createCommand = Command.make(
   "create",

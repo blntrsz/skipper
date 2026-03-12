@@ -15,7 +15,7 @@ export class PickerNoMatch extends Schema.TaggedErrorClass<PickerNoMatch>(
   "skipper/PickerNoMatch"
 )("PickerNoMatch", { query: Schema.String }) {}
 
-export const Picker = ServiceMap.Service<{
+export interface PickerService {
   pick: ({
     options,
     message,
@@ -23,4 +23,6 @@ export const Picker = ServiceMap.Service<{
     options: string[];
     message: string;
   }) => Effect.Effect<string, PickerError | PickerCancelled | PickerNoMatch, never>;
-}>("Picker");
+}
+
+export const PickerService = ServiceMap.Service<PickerService>("PickerService");

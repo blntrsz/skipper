@@ -1,2 +1,2 @@
-export * from "./Service";
 export * from "./GitService";
+export * from "./ShellGitService";

@@ -1,9 +1,11 @@
 import { Effect, ServiceMap } from "effect";
-import type { ShellError, Shell } from "../Shell";
+import { type ShellError, ShellService } from "../Shell";
 
-export const Tmux = ServiceMap.Service<{
+export interface TmuxService {
   attachSession: (
     sessionName: string,
     path: string
-  ) => Effect.Effect<void, ShellError, typeof Shell.Service>;
-}>("Tmux");
+  ) => Effect.Effect<void, ShellError, typeof ShellService.Service>;
+}
+
+export const TmuxService = ServiceMap.Service<TmuxService>("TmuxService");

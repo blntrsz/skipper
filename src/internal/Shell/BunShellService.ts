@@ -1,7 +1,7 @@
 import { Effect, ServiceMap } from "effect";
-import { Shell, ShellError } from "./Service";
+import { ShellError, ShellService } from "./ShellService";
 
-export const BunShell = ServiceMap.make(Shell, {
+export const BunShellService = ServiceMap.make(ShellService, {
   bool: ({ command, errorMessage }) => {
     return Effect.tryPromise({
       try: async () =>

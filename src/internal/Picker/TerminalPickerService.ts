@@ -1,6 +1,11 @@
 import { Effect, ServiceMap } from "effect";
 import { clearScreenDown, cursorTo, emitKeypressEvents, moveCursor } from "node:readline";
-import { Picker, PickerCancelled, PickerError, PickerNoMatch } from "./Service";
+import {
+  PickerCancelled,
+  PickerError,
+  PickerNoMatch,
+  PickerService,
+} from "./PickerService";
 
 const MAX_VISIBLE = 8;
 const normalize = (s: string) => s.trim().toLowerCase();
@@ -18,7 +23,7 @@ const filter = (query: string, options: string[]): string[] => {
     .map((x) => x.opt);
 };
 
-export const TerminalPicker = ServiceMap.make(Picker, {
+export const TerminalPickerService = ServiceMap.make(PickerService, {
   pick: ({ options, message }) =>
     Effect.callback<string, PickerCancelled | PickerError | PickerNoMatch>((resume) => {
       if (!process.stdin.isTTY || !process.stdout.isTTY) {

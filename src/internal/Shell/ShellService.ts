@@ -7,7 +7,7 @@ export class ShellError extends Schema.TaggedErrorClass<ShellError>(
   cause: Schema.optional(Schema.Defect),
 }) {}
 
-export const Shell = ServiceMap.Service<{
+export interface ShellService {
   bool: ({
     command,
     errorMessage,
@@ -29,4 +29,6 @@ export const Shell = ServiceMap.Service<{
     command: string[];
     errorMessage: string;
   }) => Effect.Effect<void, ShellError, never>;
-}>("Shell");
+}
+
+export const ShellService = ServiceMap.Service<ShellService>("ShellService");

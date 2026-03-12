@@ -3,7 +3,7 @@ import type { NoSuchElementError } from "effect/Cause";
 import type { SchemaError } from "effect/Schema";
 import type { SqlClient } from "effect/unstable/sql";
 import type { SqlError } from "effect/unstable/sql/SqlError";
-import * as Task from "../domain/Task";
+import { Task } from "@/domain";
 
 export interface TaskService {
   create: (

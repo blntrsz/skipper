@@ -1,24 +1,29 @@
 import { Effect, FileSystem, Layer, ServiceMap } from "effect";
 import { Argument, Command, Flag } from "effect/unstable/cli";
-import { SandboxService } from "./Service";
+import { SandboxService } from "./SandboxService";
 import { GitRepositoryOption } from "../domain/GitRepository";
-import { SandboxServiceImpl } from "./SandboxService";
+import { TmuxWorkTreeSandboxService } from "./TmuxWorkTreeSandboxService";
 import * as RepositoryPath from "../domain/RepositoryPath";
 import { systemError } from "effect/PlatformError";
-import { SwitchService, SwitchServiceImpl } from "./SwitchService";
-import { PickerCancelled, PickerNoMatch } from "@/internal/Picker/Service";
-import { TerminalPicker } from "@/internal/Picker/TerminalService";
+import { SwitchService } from "./SwitchService";
+import { TmuxSwitchService } from "./TmuxSwitchService";
+import { PickerCancelled, PickerNoMatch } from "@/internal/Picker/PickerService";
+import { TerminalPickerService } from "@/internal/Picker/TerminalPickerService";
 import { Git } from "@/internal";
-import { TmuxService } from "@/internal/Tmux";
+import { ShellTmuxService } from "@/internal/Tmux";
 
-const sandboxLayer = SandboxServiceImpl.pipe(
-  Layer.provide(Layer.succeedServices(ServiceMap.mergeAll(Git.GitService)))
+const sandboxLayer = TmuxWorkTreeSandboxService.pipe(
+  Layer.provide(Layer.succeedServices(ServiceMap.mergeAll(Git.ShellGitService)))
 );
 
-const switchLayer = SwitchServiceImpl.pipe(
+const switchLayer = TmuxSwitchService.pipe(
   Layer.provide(
     Layer.succeedServices(
-      ServiceMap.mergeAll(TmuxService, TerminalPicker, Git.GitService)
+      ServiceMap.mergeAll(
+        ShellTmuxService,
+        TerminalPickerService,
+        Git.ShellGitService
+      )
     )
   )
 );

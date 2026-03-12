@@ -1,13 +1,13 @@
 import { Effect, ServiceMap } from "effect";
 import * as Shell from "../Shell";
-import { Tmux } from "./TmuxService";
+import { TmuxService } from "./TmuxService";
 
-export const TmuxService = ServiceMap.make(Tmux, {
+export const ShellTmuxService = ServiceMap.make(TmuxService, {
   attachSession: (sessionName: string, path: string) =>
     Effect.scoped(
       Effect.gen(function* () {
         const isInTmuxSession = !!process.env.TMUX;
-        const { $, bool, exec } = yield* Shell.Shell;
+        const { $, bool, exec } = yield* Shell.ShellService;
 
         const pgrep = yield* $({
           command: "pgrep tmux",
