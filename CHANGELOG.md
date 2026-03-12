@@ -1,5 +1,11 @@
 # @skippercorp/skipper
 
+## 1.4.6
+
+### Patch Changes
+
+- 71b2907: fix: use Bun.spawnSync stdio passthrough for tmux attach in compiled builds
+
 ## 1.4.5
 
 ### Patch Changes
