@@ -1,5 +1,11 @@
 # @skippercorp/skipper
 
+## 1.4.5
+
+### Patch Changes
+
+- f758370: fix: enable shell mode for spawnSync to allow command resolution via PATH
+
 ## 1.4.4
 
 ### Patch Changes
