@@ -1,4 +1,3 @@
-import { spawnSync } from "child_process";
 import { Effect, ServiceMap } from "effect";
 import { Shell, ShellError } from "./Service";
 
@@ -36,18 +35,23 @@ export const BunShell = ServiceMap.make(Shell, {
   exec: ({ command, errorMessage }) => {
     return Effect.try({
       try: () => {
-        process.stderr.write(`[exec:debug] spawnSync: ${command.join(" ")}\n`);
-        const result = spawnSync(command[0]!, command.slice(1), {
-          shell: true,
+        process.stderr.write(`[exec:debug] Bun.spawnSync: ${command.join(" ")}\n`);
+        process.stderr.write(
+          `[exec:debug] isTTY=${process.stdin.isTTY} pid=${process.pid}\n`
+        );
+        const result = Bun.spawnSync({
+          cmd: command,
+          stdin: 0,
+          stdout: 1,
+          stderr: 2,
           env: process.env,
-          stdio: "inherit",
         });
         process.stderr.write(
-          `[exec:debug] status=${result.status} signal=${
-            result.signal ?? "(none)"
-          } error=${result.error?.message ?? "(none)"}\n`
+          `[exec:debug] status=${result.exitCode} signal=${
+            result.signalCode ?? "(none)"
+          } success=${result.success}\n`
         );
-        if (result.status !== 0) {
+        if (!result.success) {
           throw new ShellError({ message: errorMessage });
         }
       },
