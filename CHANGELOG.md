@@ -1,5 +1,15 @@
 # @skippercorp/skipper
 
+## 1.5.0
+
+### Minor Changes
+
+- 9040d3b: feat: add persisted session commands and store sandbox history in sqlite
+
+### Patch Changes
+
+- 31d1ec5: fix: remove tmux attach debug noise from normal CLI use
+
 ## 1.4.6
 
 ### Patch Changes
