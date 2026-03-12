@@ -1,5 +1,12 @@
 # @skippercorp/skipper
 
+## 1.4.2
+
+### Patch Changes
+
+- c9b6fb9: upgrade packages
+- fb999b2: fix tmux attach freeze in compiled binary by using spawnSync
+
 ## 1.4.1
 
 ### Patch Changes
