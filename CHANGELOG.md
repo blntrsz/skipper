@@ -1,5 +1,11 @@
 # @skippercorp/skipper
 
+## 1.4.3
+
+### Patch Changes
+
+- cd745be: add debug logs for tmux attach failures
+
 ## 1.4.2
 
 ### Patch Changes
