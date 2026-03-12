@@ -38,6 +38,7 @@ export const BunShell = ServiceMap.make(Shell, {
       try: () => {
         process.stderr.write(`[exec:debug] spawnSync: ${command.join(" ")}\n`);
         const result = spawnSync(command[0]!, command.slice(1), {
+          shell: true,
           env: process.env,
           stdio: "inherit",
         });
