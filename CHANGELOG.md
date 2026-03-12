@@ -1,5 +1,11 @@
 # @skippercorp/skipper
 
+## 1.4.4
+
+### Patch Changes
+
+- 6e0bda8: debug: log shell errors in catch block
+
 ## 1.4.3
 
 ### Patch Changes
