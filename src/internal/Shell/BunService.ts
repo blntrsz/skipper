@@ -42,13 +42,16 @@ export const BunShell = ServiceMap.make(Shell, {
           stdio: "inherit",
         });
         process.stderr.write(
-          `[exec:debug] status=${result.status} signal=${result.signal ?? "(none)"} error=${result.error?.message ?? "(none)"}\n`
+          `[exec:debug] status=${result.status} signal=${
+            result.signal ?? "(none)"
+          } error=${result.error?.message ?? "(none)"}\n`
         );
         if (result.status !== 0) {
           throw new ShellError({ message: errorMessage });
         }
       },
       catch: (cause) => {
+        console.log(cause);
         if (cause instanceof ShellError) return cause;
         return new ShellError({
           message:
