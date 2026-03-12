@@ -1,3 +1,4 @@
+import { spawnSync } from "child_process";
 import { Effect, ServiceMap } from "effect";
 import { Shell, ShellError } from "./Service";
 
@@ -33,19 +34,14 @@ export const BunShell = ServiceMap.make(Shell, {
     });
   },
   exec: ({ command, errorMessage }) => {
-    return Effect.tryPromise({
-      try: async () => {
-        const proc = Bun.spawn(command, {
+    return Effect.try({
+      try: () => {
+        const result = spawnSync(command[0]!, command.slice(1), {
           env: process.env,
-          stdin: "inherit",
-          stdout: "inherit",
-          stderr: "inherit",
+          stdio: "inherit",
         });
-        const exitCode = await proc.exited;
-        if (exitCode !== 0) {
-          throw new ShellError({
-            message: errorMessage,
-          });
+        if (result.status !== 0) {
+          throw new ShellError({ message: errorMessage });
         }
       },
       catch: (cause) => {
