@@ -1,19 +1,14 @@
 import { Effect } from "effect";
-import { BunRuntime, BunServices } from "@effect/platform-bun";
+import { BunRuntime } from "@effect/platform-bun";
 import { CliError, Command } from "effect/unstable/cli";
 import packageJson from "../package.json";
 import { cloneCommand, sandboxCommand } from "./Sandbox/Cli";
+import { runtime } from "./Runtime";
 import { SessionCli } from "./Session/Cli";
 import { TaskCli } from "./Task/Cli";
-import { BunShellService } from "./internal/Shell";
 
 const command = Command.make("skipper").pipe(
-  Command.withSubcommands([
-    cloneCommand,
-    sandboxCommand,
-    SessionCli,
-    TaskCli,
-  ])
+  Command.withSubcommands([cloneCommand, sandboxCommand, SessionCli, TaskCli])
 );
 
 const cli = Effect.gen(function* () {
@@ -29,6 +24,8 @@ const cli = Effect.gen(function* () {
   )
 );
 
-BunRuntime.runMain(
-  Effect.provide(Effect.provide(cli, BunServices.layer), BunShellService)
+const main = runtime.servicesEffect.pipe(
+  Effect.flatMap((services) => cli.pipe(Effect.provideServices(services)))
 );
+
+BunRuntime.runMain(main);

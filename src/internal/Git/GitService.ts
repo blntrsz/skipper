@@ -1,6 +1,8 @@
 import { Effect, FileSystem, Option, Schema, ServiceMap } from "effect";
-import type { RepositoryPath as RepositoryPathType } from "@/domain/RepositoryPath";
-import type { WorkTreePath } from "@/domain/WorkTreePath";
+import type {
+  RepositoryPath as RepositoryPathType,
+  WorkTreePath,
+} from "@/domain/Path";
 import type {
   GitRepository,
   GitRepositoryOption,
