@@ -1,8 +1,9 @@
-const domainPath = "^src/domain(?:/|$)";
-const internalPath = "^src/internal(?:/|$)";
+const corePath = "^packages/core/src(?:/|$)";
+const domainPath = "^packages/core/src/domain(?:/|$)";
+const internalPath = "^packages/core/src/internal(?:/|$)";
 const verticalSlicePath =
-  "^src/(?!domain(?:/|$)|internal(?:/|$)|migrations(?:/|$))[^/]+/";
-const cliPath = "^src/Cli\\.ts$";
+  "^packages/core/src/(?!domain(?:/|$)|internal(?:/|$)|migrations(?:/|$))[^/]+/";
+const cliPath = "^packages/cli/src(?:/|$)";
 
 module.exports = {
   forbidden: [
@@ -28,6 +29,12 @@ module.exports = {
       name: "vertical-slices-cant-depend-on-cli",
       severity: "error",
       from: { path: verticalSlicePath },
+      to: { path: cliPath },
+    },
+    {
+      name: "core-cant-depend-on-cli",
+      severity: "error",
+      from: { path: corePath },
       to: { path: cliPath },
     },
   ],
