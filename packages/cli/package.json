@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@skippercorp/skipper",
+  "version": "1.4.6",
+  "type": "module",
+  "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "bin/**/*",
+    "src/**/*.ts",
+    "!src/**/*.test.ts"
+  ],
+  "bin": {
+    "sk": "./bin/skipper"
+  },
+  "scripts": {
+    "cli": "bun run ./src/Cli.ts",
+    "typecheck": "bun x tsc --noEmit -p tsconfig.json",
+    "test": "bun run typecheck",
+    "deps:check": "bun x tsc --noEmit -p tsconfig.json",
+    "build": "bun build ./src/Cli.ts --target bun-darwin-arm64 --compile --outfile bin/skipper"
+  },
+  "dependencies": {
+    "@effect/platform-bun": "4.0.0-beta.30",
+    "effect": "4.0.0-beta.30"
+  },
+  "devDependencies": {
+    "@skippercorp/core": "workspace:*"
+  }
+}

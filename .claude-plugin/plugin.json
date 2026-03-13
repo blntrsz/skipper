@@ -1,0 +1,5 @@
+{
+  "name": "skipper-claude-code-session",
+  "description": "Mirror Claude Code workspace sessions into skipper",
+  "version": "0.1.0"
+}
