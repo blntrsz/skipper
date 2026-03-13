@@ -1,5 +1,12 @@
 # @skippercorp/skipper-cli
 
+## 0.0.2
+
+### Patch Changes
+
+- 0453da3: Initial release
+- 2710c8f: Refactor the CLI into workspace packages, keep runtime access on public imports, and add repo-wide check tooling for lint, format, typecheck, depcruise, and Sheriff.
+
 ## 0.0.1
 
 ### Minor Changes
