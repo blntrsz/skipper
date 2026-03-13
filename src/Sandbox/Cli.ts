@@ -1,32 +1,11 @@
-import { Effect, FileSystem, Layer, ServiceMap } from "effect";
+import { Effect, FileSystem } from "effect";
 import { Argument, Command, Flag } from "effect/unstable/cli";
 import { SandboxService } from "./SandboxService";
 import { GitRepositoryOption } from "../domain/GitRepository";
-import { TmuxWorkTreeSandboxService } from "./TmuxWorkTreeSandboxService";
-import * as RepositoryPath from "../domain/RepositoryPath";
+import * as Path from "../domain/Path";
 import { systemError } from "effect/PlatformError";
 import { SwitchService } from "./SwitchService";
-import { TmuxSwitchService } from "./TmuxSwitchService";
 import { PickerCancelled, PickerNoMatch } from "@/internal/Picker/PickerService";
-import { TerminalPickerService } from "@/internal/Picker/TerminalPickerService";
-import { Git } from "@/internal";
-import { ShellTmuxService } from "@/internal/Tmux";
-
-const sandboxLayer = TmuxWorkTreeSandboxService.pipe(
-  Layer.provide(Layer.succeedServices(ServiceMap.mergeAll(Git.ShellGitService)))
-);
-
-const switchLayer = TmuxSwitchService.pipe(
-  Layer.provide(
-    Layer.succeedServices(
-      ServiceMap.mergeAll(
-        ShellTmuxService,
-        TerminalPickerService,
-        Git.ShellGitService
-      )
-    )
-  )
-);
 
 const flags = {
   git: {
@@ -56,7 +35,7 @@ export const cloneCommand = Command.make(
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
 
-      yield* fs.makeDirectory(RepositoryPath.root(), { recursive: true });
+      yield* fs.makeDirectory(Path.repositoryRoot(), { recursive: true });
 
       yield* Effect.tryPromise({
         try: async () => {
@@ -66,7 +45,7 @@ export const cloneCommand = Command.make(
             "clone",
             input.repository,
           ]}`
-            .cwd(RepositoryPath.root())
+            .cwd(Path.repositoryRoot())
             .env(process.env)
             .nothrow();
 
@@ -82,7 +61,7 @@ export const cloneCommand = Command.make(
             module: "SandboxCli",
             method: "cloneCommand",
             description: `Failed to clone repository '${input.repository}'`,
-            pathOrDescriptor: RepositoryPath.root(),
+            pathOrDescriptor: Path.repositoryRoot(),
             cause,
           }),
       });
@@ -100,7 +79,7 @@ export const addCommand = Command.make("add", flags, (config) =>
       { type: "tmux-worktree" },
       GitRepositoryOption.makeUnsafe(config.git)
     );
-  }).pipe(Effect.provide(sandboxLayer))
+  })
 ).pipe(Command.withDescription("Create sandbox resources"));
 
 export const removeCommand = Command.make("remove", flags, (config) =>
@@ -111,7 +90,7 @@ export const removeCommand = Command.make("remove", flags, (config) =>
       { type: "tmux-worktree" },
       GitRepositoryOption.makeUnsafe(config.git)
     );
-  }).pipe(Effect.provide(sandboxLayer))
+  })
 ).pipe(
   Command.withAlias("rm"),
   Command.withDescription("Remove sandbox resources")
@@ -136,8 +115,7 @@ const switchCommand = Command.make(
         (error): error is PickerCancelled | PickerNoMatch =>
           error instanceof PickerCancelled || error instanceof PickerNoMatch,
         () => Effect.void
-      ),
-      Effect.provide(switchLayer)
+      )
     )
 ).pipe(
   Command.withAlias("sw"),

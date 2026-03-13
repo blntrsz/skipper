@@ -12,7 +12,9 @@ export interface SandboxService {
   ) => Effect.Effect<
     void,
     PlatformError | Shell.ShellError | Git.GitError,
-    FileSystem.FileSystem | typeof Shell.ShellService.Service
+    | FileSystem.FileSystem
+    | typeof Git.GitService.Service
+    | typeof Shell.ShellService.Service
   >;
   remove: (
     config: SandboxConfig,
@@ -20,7 +22,9 @@ export interface SandboxService {
   ) => Effect.Effect<
     void,
     PlatformError | Shell.ShellError | Git.GitError,
-    FileSystem.FileSystem | typeof Shell.ShellService.Service
+    | FileSystem.FileSystem
+    | typeof Git.GitService.Service
+    | typeof Shell.ShellService.Service
   >;
 }
 

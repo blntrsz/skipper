@@ -1,15 +1,12 @@
 import { join } from "node:path";
 import { createInterface } from "node:readline/promises";
-import { Effect, FileSystem, Layer, Option } from "effect";
+import { Effect, FileSystem, Option, ServiceMap } from "effect";
 import { UnknownError } from "effect/Cause";
 import type { GitRepository } from "@/domain/GitRepository";
 import { GitRepository as GitRepositorySchema } from "@/domain/GitRepository";
-import * as RepositoryPath from "@/domain/RepositoryPath";
-import * as WorkTreePath from "@/domain/WorkTreePath";
-import { resolveWorkspacePath } from "@/domain/WorkspacePath";
+import * as Path from "@/domain/Path";
 import { Git, Tmux } from "@/internal";
 import { PickerService } from "@/internal/Picker/PickerService";
-import { sanitizeNameSegment } from "@/internal/SkipperPaths";
 import { SwitchService } from "./SwitchService";
 
 const isInteractive = () =>
@@ -106,15 +103,6 @@ const listWorkTreePaths = (path: string) =>
     return yield* walk(path, []);
   });
 
-const workTreePathToBranch = (repository: string, path: string) => {
-  const [head = "", ...tail] = path.split(/[\\/]/);
-  const prefix = `${repository}.`;
-
-  return [head.startsWith(prefix) ? head.slice(prefix.length) : head, ...tail]
-    .filter((value) => value.length > 0)
-    .join("/");
-};
-
 export const sortBranches = (branches: ReadonlyArray<string>) =>
   [...new Set(branches)].sort((left, right) => {
     if (left === "main") {
@@ -129,13 +117,13 @@ export const sortBranches = (branches: ReadonlyArray<string>) =>
   });
 
 export const makeSessionName = (repository: string, branch: string) => {
-  return `${sanitizeNameSegment(repository)}-${sanitizeNameSegment(branch)}`;
+  return `${Path.sanitizeNameSegment(repository)}-${Path.sanitizeNameSegment(branch)}`;
 };
 
 export const resolveTargetPath = (repository: string, branch: string) =>
-  resolveWorkspacePath({ repository, branch } satisfies GitRepository);
+  Path.resolveWorkspacePath({ repository, branch } satisfies GitRepository);
 
-export const listRepositories = (root = RepositoryPath.root()) =>
+export const listRepositories = (root = Path.repositoryRoot()) =>
   Effect.gen(function* () {
     const repositories = yield* listDirectoryNames(root);
     const checks = yield* Effect.forEach(repositories, (repository) =>
@@ -159,8 +147,8 @@ export const listBranches = (
   }
 ) =>
   Effect.gen(function* () {
-    const repositoryRoot = options?.repositoryRoot ?? RepositoryPath.root();
-    const workTreeRoot = options?.workTreeRoot ?? WorkTreePath.root();
+    const repositoryRoot = options?.repositoryRoot ?? Path.repositoryRoot();
+    const workTreeRoot = options?.workTreeRoot ?? Path.workTreeRoot();
     const repositoryPath = join(repositoryRoot, repository);
     const repositoryExists = yield* pathExists(repositoryPath).pipe(
       Effect.mapError(
@@ -189,7 +177,7 @@ export const listBranches = (
 
     return sortBranches([
       "main",
-      ...branches.map((path) => workTreePathToBranch(repository, path)),
+      ...branches.map((path) => Path.workTreeRelativePathToBranch(repository, path)),
     ]);
   });
 
@@ -226,7 +214,7 @@ const resolveRepository = (repository: string) =>
       return yield* Effect.fail(
         new UnknownError(
           undefined,
-          `Repository '${repository}' not found in '${RepositoryPath.root()}'`
+          `Repository '${repository}' not found in '${Path.repositoryRoot()}'`
         )
       );
     }
@@ -248,108 +236,99 @@ const resolveBranch = (
         )
       );
 
-export const TmuxSwitchService = Layer.effect(
-  SwitchService,
+const run: SwitchService["run"] = (input) =>
   Effect.gen(function* () {
-    const tmux = yield* Tmux.TmuxService;
-    const picker = yield* PickerService;
-    const git = yield* Git.GitService;
+    if (!hasTerminal()) {
+      return yield* Effect.fail(
+        new UnknownError(undefined, "Switch requires an interactive terminal")
+      );
+    }
 
-    const run: SwitchService["run"] = (input) =>
-      Effect.gen(function* () {
-        if (!hasTerminal()) {
-          return yield* Effect.fail(
-            new UnknownError(
-              undefined,
-              "Switch requires an interactive terminal"
-            )
-          );
-        }
-
-        const repository = Option.isSome(input.repository)
-          ? yield* resolveRepository(input.repository.value)
-          : yield* ensureInteractive(
-              Effect.gen(function* () {
-                const repositories = yield* listRepositories();
-                if (repositories.length === 0) {
-                  return yield* Effect.fail(
-                    new UnknownError(
-                      undefined,
-                      `No repositories found in '${RepositoryPath.root()}'`
-                    )
-                  );
-                }
-                return yield* picker.pick({
-                  message: "Repository",
-                  options: repositories,
-                });
-              })
-            );
-
-        if (input.create) {
-          const branch = yield* ensureInteractive(promptForBranchName);
-
-          const repositoryPath = RepositoryPath.make(repository);
-          const workTreePath = WorkTreePath.make({ repository, branch });
-          const workTreeRepositoryPath = WorkTreePath.makeRepositoryPath({
-            repository,
-            branch,
-          });
-
-          const fs = yield* FileSystem.FileSystem;
-          const isWorkTreeExists = yield* fs.exists(workTreePath);
-
-          if (!isWorkTreeExists) {
-            yield* fs.makeDirectory(workTreeRepositoryPath, {
-              recursive: true,
+    const repository = Option.isSome(input.repository)
+      ? yield* resolveRepository(input.repository.value)
+      : yield* ensureInteractive(
+          Effect.gen(function* () {
+            const picker = yield* PickerService;
+            const repositories = yield* listRepositories();
+            if (repositories.length === 0) {
+              return yield* Effect.fail(
+                new UnknownError(
+                  undefined,
+                  `No repositories found in '${Path.repositoryRoot()}'`
+                )
+              );
+            }
+            return yield* picker.pick({
+              message: "Repository",
+              options: repositories,
             });
-            yield* git.createWorkTree(
-              repositoryPath,
-              workTreePath,
-              GitRepositorySchema.makeUnsafe({ repository, branch })
-            );
-          }
-
-          const targetPath = resolveTargetPath(repository, branch);
-          yield* tmux.attachSession(
-            makeSessionName(repository, branch),
-            targetPath
-          );
-          return;
-        }
-
-        const branches = yield* listBranches(repository);
-        const branch = Option.isSome(input.branch)
-          ? yield* resolveBranch(repository, input.branch.value, branches)
-          : yield* ensureInteractive(
-              picker.pick({ message: "Branch", options: [...branches] })
-            );
-        const targetPath = resolveTargetPath(repository, branch);
-        const targetExists = yield* pathExists(targetPath).pipe(
-          Effect.mapError(
-            (error) =>
-              new UnknownError(
-                error,
-                `Failed to resolve path for '${repository}:${branch}'`
-              )
-          )
+          })
         );
 
-        if (!targetExists) {
-          return yield* Effect.fail(
-            new UnknownError(
-              undefined,
-              `Target path '${targetPath}' not found for '${repository}:${branch}'`
-            )
-          );
-        }
+    if (input.create) {
+      const git = yield* Git.GitService;
+      const branch = yield* ensureInteractive(promptForBranchName);
 
-        yield* tmux.attachSession(
-          makeSessionName(repository, branch),
-          targetPath
-        );
+      const repositoryPath = Path.makeRepositoryPath(repository);
+      const workTreePath = Path.makeWorkTreePath({ repository, branch });
+      const workTreeRepositoryPath = Path.makeWorkTreeRepositoryPath({
+        repository,
       });
 
-    return { run } satisfies SwitchService;
-  })
-);
+      const fs = yield* FileSystem.FileSystem;
+      const isWorkTreeExists = yield* fs.exists(workTreePath);
+
+      if (!isWorkTreeExists) {
+        yield* fs.makeDirectory(workTreeRepositoryPath, {
+          recursive: true,
+        });
+        yield* git.createWorkTree(
+          repositoryPath,
+          workTreePath,
+          GitRepositorySchema.makeUnsafe({ repository, branch })
+        );
+      }
+
+      const targetPath = resolveTargetPath(repository, branch);
+      const tmux = yield* Tmux.TmuxService;
+      yield* tmux.attachSession(makeSessionName(repository, branch), targetPath);
+      return;
+    }
+
+    const branches = yield* listBranches(repository);
+    const branch = Option.isSome(input.branch)
+      ? yield* resolveBranch(repository, input.branch.value, branches)
+      : yield* ensureInteractive(
+          Effect.gen(function* () {
+            const picker = yield* PickerService;
+            return yield* picker.pick({
+              message: "Branch",
+              options: [...branches],
+            });
+          })
+        );
+    const targetPath = resolveTargetPath(repository, branch);
+    const targetExists = yield* pathExists(targetPath).pipe(
+      Effect.mapError(
+        (error) =>
+          new UnknownError(
+            error,
+            `Failed to resolve path for '${repository}:${branch}'`
+          )
+      )
+    );
+
+    if (!targetExists) {
+      return yield* Effect.fail(
+        new UnknownError(
+          undefined,
+          `Target path '${targetPath}' not found for '${repository}:${branch}'`
+        )
+      );
+    }
+
+    const tmux = yield* Tmux.TmuxService;
+    yield* tmux.attachSession(makeSessionName(repository, branch), targetPath);
+  });
+
+export const TmuxSwitchService = ServiceMap.make(SwitchService, { run });

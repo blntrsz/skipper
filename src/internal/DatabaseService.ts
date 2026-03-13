@@ -3,35 +3,39 @@ import { SqliteClient } from "@effect/sql-sqlite-bun";
 import { SqliteMigrator } from "@effect/sql-sqlite-bun";
 import { BunFileSystem } from "@effect/platform-bun";
 import { migrations } from "../migrations";
-import { databaseDir, databasePath } from "./SkipperPaths";
+import * as Path from "@/domain/Path";
 
-const DB_PATH = databasePath();
-const DB_DIR = databaseDir();
-
-const migratorOptions = {
+export const migratorOptions = {
   loader: SqliteMigrator.fromRecord(migrations),
 } as const;
 
-const EnsureDatabaseDirectoryLive = Layer.effectDiscard(
-  Effect.gen(function* () {
-    const fileSystem = yield* FileSystem.FileSystem;
-    yield* fileSystem.makeDirectory(DB_DIR, { recursive: true });
-  })
-).pipe(Layer.provide(BunFileSystem.layer));
+const makeEnsureDatabaseDirectoryLive = () =>
+  Layer.effectDiscard(
+    Effect.gen(function* () {
+      const fileSystem = yield* FileSystem.FileSystem;
+      yield* fileSystem.makeDirectory(Path.databaseDir(), { recursive: true });
+    })
+  ).pipe(Layer.provide(BunFileSystem.layer));
 
-const SqliteLive = SqliteClient.layer({
-  filename: DB_PATH,
-  create: true,
-  transformQueryNames: String.camelToSnake,
-  transformResultNames: String.snakeToCamel,
-}).pipe(Layer.provide(EnsureDatabaseDirectoryLive));
+export const makeDatabaseLive = () => {
+  return Layer.unwrap(
+    Effect.sync(() => {
+      const sqliteLive = SqliteClient.layer({
+        filename: Path.databasePath(),
+        create: true,
+        transformQueryNames: String.camelToSnake,
+        transformResultNames: String.snakeToCamel,
+      }).pipe(Layer.provide(makeEnsureDatabaseDirectoryLive()));
 
-const MigratorLive = SqliteMigrator.layer(migratorOptions);
+      const migratorLive = SqliteMigrator.layer(migratorOptions);
+
+      return migratorLive.pipe(Layer.provideMerge(sqliteLive));
+    })
+  );
+};
 
 export const runMigrations = SqliteMigrator.run(migratorOptions).pipe(
   Effect.asVoid
 );
-
-export const DatabaseLive = MigratorLive.pipe(Layer.provideMerge(SqliteLive));
 
 export { SqliteClient };

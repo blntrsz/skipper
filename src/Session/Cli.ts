@@ -1,9 +1,8 @@
 import { Effect, Option } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
 import * as Session from "../domain/Session";
-import { DatabaseLive, runMigrations } from "../internal/DatabaseService";
+import { withDatabase } from "../Runtime";
 import { SessionService } from "./SessionService";
-import { SqlSessionService } from "./SqlSessionService";
 
 const sessionStateChoices = ["idle", "working", "unread", "stuck"] as const;
 const sessionMessageRoleChoices = ["user", "assistant", "system"] as const;
@@ -19,11 +18,7 @@ const printJson = (value: unknown) =>
   });
 
 const withSessionDependencies = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-  Effect.gen(function* () {
-    yield* runMigrations;
-
-    return yield* effect;
-  }).pipe(Effect.provide(SqlSessionService), Effect.provide(DatabaseLive));
+  withDatabase(effect);
 
 const createCommand = Command.make(
   "create",

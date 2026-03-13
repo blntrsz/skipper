@@ -3,9 +3,11 @@ import {
   GitRepository,
   type GitRepositoryOption,
 } from "@/domain/GitRepository";
-import * as RepositoryPath from "@/domain/RepositoryPath";
-import type { RepositoryPath as RepositoryPathType } from "@/domain/RepositoryPath";
-import type { WorkTreePath } from "@/domain/WorkTreePath";
+import * as Path from "@/domain/Path";
+import type {
+  RepositoryPath as RepositoryPathType,
+  WorkTreePath,
+} from "@/domain/Path";
 import * as Shell from "@/internal/Shell";
 import { GitError, GitService } from "./GitService";
 
@@ -54,7 +56,7 @@ export const ShellGitService = ServiceMap.make(GitService, {
   ensureRepositoryExists: (repository: string) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
-      const repositoryPath = RepositoryPath.make(repository);
+      const repositoryPath = Path.makeRepositoryPath(repository);
 
       const exists = yield* fs.exists(repositoryPath).pipe(
         Effect.mapError(
@@ -72,7 +74,7 @@ export const ShellGitService = ServiceMap.make(GitService, {
 
       return yield* Effect.fail(
         new GitError({
-          message: `Repository '${repository}' not found in '${RepositoryPath.root()}'`,
+          message: `Repository '${repository}' not found in '${Path.repositoryRoot()}'`,
         })
       );
     }),

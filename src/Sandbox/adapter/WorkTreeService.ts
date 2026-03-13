@@ -1,7 +1,6 @@
 import { Effect, FileSystem } from "effect";
-import * as RepositoryPath from "@/domain/RepositoryPath";
-import * as WorkTreePath from "@/domain/WorkTreePath";
 import { GitRepository } from "@/domain/GitRepository";
+import * as Path from "@/domain/Path";
 import { Git } from "@/internal";
 
 export const create = (config: GitRepository) =>
@@ -13,13 +12,13 @@ export const create = (config: GitRepository) =>
 
     const fs = yield* FileSystem.FileSystem;
     const git = yield* Git.GitService;
-    const repositoryPath = RepositoryPath.make(config.repository);
-    const workTreeRepositoryPath = WorkTreePath.makeRepositoryPath(config);
+    const repositoryPath = Path.makeRepositoryPath(config.repository);
+    const workTreeRepositoryPath = Path.makeWorkTreeRepositoryPath(config);
     const gitRepository = GitRepository.makeUnsafe({
       repository: config.repository,
       branch: config.branch,
     });
-    const workTreePath = WorkTreePath.make(config);
+    const workTreePath = Path.makeWorkTreePath(config);
     const isWorkTreeExists = yield* fs.exists(workTreePath);
 
     if (isWorkTreeExists) {
@@ -38,8 +37,8 @@ export const remove = (config: GitRepository) =>
 
     const fs = yield* FileSystem.FileSystem;
     const git = yield* Git.GitService;
-    const repositoryPath = RepositoryPath.make(config.repository);
-    const workTreePath = WorkTreePath.make(config);
+    const repositoryPath = Path.makeRepositoryPath(config.repository);
+    const workTreePath = Path.makeWorkTreePath(config);
     const isWorkTreeExists = yield* fs.exists(workTreePath);
 
     if (!isWorkTreeExists) {

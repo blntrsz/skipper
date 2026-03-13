@@ -1,4 +1,4 @@
-import { Effect, Layer } from "effect";
+import { Effect, ServiceMap } from "effect";
 import { SandboxService } from "./SandboxService";
 import * as WorkTreeSandbox from "./adapter/WorkTreeService";
 import { Git } from "@/internal";
@@ -10,35 +10,27 @@ import { Git } from "@/internal";
  * @since 1.0.0
  * @category ServiceMethod
  */
-export const TmuxWorkTreeSandboxService = Layer.effect(
-  SandboxService,
+const create: SandboxService["create"] = (_config, git) =>
   Effect.gen(function* () {
     const gitService = yield* Git.GitService;
+    const gitRepository = yield* gitService.resolveGitRepository(git);
 
-    const create: SandboxService["create"] = (_config, git) =>
-      Effect.gen(function* () {
-        const gitRepository = yield* gitService.resolveGitRepository(git);
+    yield* WorkTreeSandbox.create(gitRepository);
+    yield* Effect.logInfo("Worktree ready");
+  });
 
-        yield* WorkTreeSandbox.create(gitRepository).pipe(
-          Effect.provideService(Git.GitService, gitService)
-        );
+const remove: SandboxService["remove"] = (config, git) =>
+  Effect.gen(function* () {
+    const gitService = yield* Git.GitService;
+    const gitRepository = yield* gitService.resolveGitRepository(git);
 
-        yield* Effect.logInfo("Worktree ready");
-      });
+    yield* WorkTreeSandbox.remove(gitRepository);
+    yield* Effect.logInfo(
+      `Sandbox removed for ${gitRepository.repository} (${config.type})`
+    );
+  });
 
-    const remove: SandboxService["remove"] = (config, git) =>
-      Effect.gen(function* () {
-        const gitRepository = yield* gitService.resolveGitRepository(git);
-
-        yield* WorkTreeSandbox.remove(gitRepository).pipe(
-          Effect.provideService(Git.GitService, gitService)
-        );
-
-        yield* Effect.logInfo(
-          `Sandbox removed for ${gitRepository.repository} (${config.type})`
-        );
-      });
-
-    return { create, remove } satisfies SandboxService;
-  })
-);
+export const TmuxWorkTreeSandboxService = ServiceMap.make(SandboxService, {
+  create,
+  remove,
+});
