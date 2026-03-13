@@ -29,15 +29,11 @@ jobs:
         run: bun run build
 
       - name: Typecheck
-        run: bun run typecheck
-
-      - name: Test
-        run: bun run test
+        run: bun run check
 
       - name: Create release PR or publish
         uses: changesets/action@6a0a831ff30acef54f2c6aa1cbbc1096b066edaf
         with:
-          version: bun run version-packages
           publish: bun run release
           title: "chore: version packages"
           commit: "chore: version packages"

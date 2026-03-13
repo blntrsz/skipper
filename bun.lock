@@ -15,8 +15,8 @@
       },
     },
     "packages/cli": {
-      "name": "@skippercorp/skipper",
-      "version": "1.4.6",
+      "name": "@skippercorp/skipper-cli",
+      "version": "0.0.1",
       "bin": {
         "sk": "./bin/skipper",
       },
@@ -30,7 +30,7 @@
     },
     "packages/core": {
       "name": "@skippercorp/core",
-      "version": "1.4.6",
+      "version": "0.0.1",
       "dependencies": {
         "@aws-sdk/client-cloudformation": "^3.1007.0",
         "@aws-sdk/client-cloudwatch-logs": "^3.1007.0",
@@ -350,7 +350,7 @@
 
     "@skippercorp/core": ["@skippercorp/core@workspace:packages/core"],
 
-    "@skippercorp/skipper": ["@skippercorp/skipper@workspace:packages/cli"],
+    "@skippercorp/skipper-cli": ["@skippercorp/skipper-cli@workspace:packages/cli"],
 
     "@smithy/abort-controller": ["@smithy/abort-controller@4.2.11", "", { "dependencies": { "@smithy/types": "^4.13.0", "tslib": "^2.6.2" } }, "sha512-Hj4WoYWMJnSpM6/kchsm4bUNTL9XiSyhvoMb2KIq4VJzyDt7JpGHUZHkVNPZVC7YE1tf8tPeVauxpFBKGW4/KQ=="],
 

@@ -2,7 +2,7 @@
   <img src="docs/skipper-logo.png" alt="Skipper logo" width="220" />
 </p>
 
-<h1 align="center">@skippercorp/skipper</h1>
+<h1 align="center">@skippercorp/skipper-cli</h1>
 
 <p align="center">
   Fast local worktree flow + task management CLI.
@@ -13,13 +13,13 @@ Workflows can be defined per user in `~/.config/skipper/workflow/*.ts` or per wo
 ## Install
 
 ```bash
-bun add -g @skippercorp/skipper
+bun add -g @skippercorp/skipper-cli
 ```
 
 Or run without installing:
 
 ```bash
-bunx @skippercorp/skipper --help
+bunx @skippercorp/skipper-cli --help
 ```
 
 ## Quick start
@@ -149,6 +149,5 @@ Uses Changesets for versioning:
 
 ```bash
 bun run changeset  # Add changeset
-bun run version-packages  # Bump versions
 bun run release  # Publish to npm
 ```
