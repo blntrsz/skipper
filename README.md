@@ -139,7 +139,9 @@ Workflow host API in V1:
 ```bash
 bun install
 bun run cli -- --help
-bun run typecheck
+bun run format
+bun run lint
+bun run check
 bun test
 ```
 
