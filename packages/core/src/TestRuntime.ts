@@ -1,4 +1,5 @@
 import { Effect, Layer, ManagedRuntime } from "effect";
+import { makeTestDatabaseLive } from "./internal/DatabaseService";
 import { ShellGitService } from "./internal/Git";
 import { TerminalPickerService } from "./internal/Picker";
 import { BunShellService } from "./internal/Shell";
@@ -9,6 +10,7 @@ import { SqlTaskService } from "./Task";
 
 export const runtime = ManagedRuntime.make(
   Layer.mergeAll(
+    makeTestDatabaseLive(),
     Layer.effectServices(Effect.succeed(ShellTmuxService)),
     Layer.effectServices(Effect.succeed(ShellGitService)),
     Layer.effectServices(Effect.succeed(TmuxWorkTreeSandboxService)),

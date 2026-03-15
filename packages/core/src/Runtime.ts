@@ -1,6 +1,6 @@
 import { BunServices } from "@effect/platform-bun";
 import { Effect, Layer, ManagedRuntime } from "effect";
-import { makeDatabaseLive, runMigrations } from "./internal/DatabaseService";
+import { makeDatabaseLive } from "./internal/DatabaseService";
 import { ShellGitService } from "./internal/Git";
 import { TerminalPickerService } from "./internal/Picker";
 import { BunShellService } from "./internal/Shell";
@@ -9,9 +9,10 @@ import { TmuxSwitchService, TmuxWorkTreeSandboxService } from "./Sandbox";
 import { SqlSessionService } from "./Session";
 import { SqlTaskService } from "./Task";
 
-const appLayer = Layer.mergeAll(
-  BunServices.layer,
+export const runtime = ManagedRuntime.make(
   Layer.mergeAll(
+    BunServices.layer,
+    makeDatabaseLive(),
     Layer.effectServices(Effect.succeed(ShellTmuxService)),
     Layer.effectServices(Effect.succeed(ShellGitService)),
     Layer.effectServices(Effect.succeed(TmuxWorkTreeSandboxService)),
@@ -22,14 +23,3 @@ const appLayer = Layer.mergeAll(
     Layer.effectServices(Effect.succeed(BunShellService)),
   ),
 );
-
-const databaseLayer = makeDatabaseLive();
-
-export const runtime = ManagedRuntime.make(appLayer);
-
-export const withDatabase = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-  Effect.gen(function* () {
-    yield* runMigrations;
-
-    return yield* effect;
-  }).pipe(Effect.provide(databaseLayer));

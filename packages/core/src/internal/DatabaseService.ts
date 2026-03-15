@@ -33,15 +33,17 @@ export const makeDatabaseLive = () => {
   );
 };
 
-const databaseLayer = makeDatabaseLive();
+export const makeTestDatabaseLive = () => {
+  const sqliteLive = SqliteClient.layer({
+    filename: ":memory:",
+    create: true,
+    transformQueryNames: EffectString.camelToSnake,
+    transformResultNames: EffectString.snakeToCamel,
+  });
 
-export const runMigrations = SqliteMigrator.run(migratorOptions).pipe(Effect.asVoid);
+  const migratorLive = SqliteMigrator.layer(migratorOptions);
 
-export const withDatabase = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-  Effect.gen(function* () {
-    yield* runMigrations;
-
-    return yield* effect;
-  }).pipe(Effect.provide(databaseLayer));
+  return migratorLive.pipe(Layer.provideMerge(sqliteLive));
+};
 
 export { SqliteClient };

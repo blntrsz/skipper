@@ -1,5 +1,4 @@
 import { Session, SessionService } from "@skippercorp/core";
-import { withDatabase } from "@skippercorp/core/Runtime";
 import { Effect, Option } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
 
@@ -16,7 +15,7 @@ const printJson = (value: unknown) =>
     process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
   });
 
-const withSessionDependencies = <A, E, R>(effect: Effect.Effect<A, E, R>) => withDatabase(effect);
+const withSessionDependencies = <A, E, R>(effect: Effect.Effect<A, E, R>) => effect;
 
 const createCommand = Command.make(
   "create",
