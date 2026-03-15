@@ -1,4 +1,11 @@
-import { type Effect, type FileSystem, type Option, ServiceMap } from "effect";
+import {
+  type Effect,
+  type FileSystem,
+  type Option,
+  type Path,
+  ServiceMap,
+  type Terminal,
+} from "effect";
 import type { UnknownError } from "effect/Cause";
 import type { PlatformError } from "effect/PlatformError";
 import type { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner";
@@ -26,9 +33,11 @@ export interface SwitchService {
     | PickerNoMatch
     | Shell.ShellError,
     | FileSystem.FileSystem
+    | Path.Path
     | typeof Git.GitService.Service
     | typeof PickerService.Service
     | typeof Shell.ShellService.Service
+    | Terminal.Terminal
     | typeof Tmux.TmuxService.Service
     | ChildProcessSpawner
   >;

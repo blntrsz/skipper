@@ -8,7 +8,7 @@
     "packages/*"
   ],
   "scripts": {
-    "cli": "bun --cwd packages/cli run cli",
+    "cli": "bun --filter '@skippercorp/skipper-cli' cli",
     "lint": "oxlint .",
     "format": "oxfmt --check .",
     "typecheck": "turbo run typecheck",

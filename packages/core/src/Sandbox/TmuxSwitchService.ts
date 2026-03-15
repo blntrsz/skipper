@@ -1,14 +1,17 @@
 import { join } from "node:path";
-import { createInterface } from "node:readline/promises";
 import { Effect, FileSystem, Option, ServiceMap } from "effect";
 import { UnknownError } from "effect/Cause";
+import { Prompt } from "effect/unstable/cli";
 import * as Path from "../domain/Path";
 import {
   type GitRepository,
   GitRepository as GitRepositorySchema,
 } from "../domain/Path";
 import { Git, Tmux } from "../internal";
-import { PickerService } from "../internal/Picker/PickerService";
+import {
+  PickerCancelled,
+  PickerService,
+} from "../internal/Picker/PickerService";
 import { SwitchService } from "./SwitchService";
 
 const isInteractive = () =>
@@ -204,20 +207,17 @@ const ensureInteractive = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
         ),
       );
 
-const promptForBranchName = Effect.tryPromise({
-  try: async () => {
-    const rl = createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    });
-    try {
-      return (await rl.question("Branch name: ")).trim();
-    } finally {
-      rl.close();
-    }
-  },
-  catch: (error) => new UnknownError(error, "Failed to read branch name"),
-});
+const promptForBranchName = Prompt.run(
+  Prompt.text({
+    message: "Branch name",
+    validate: (value) => {
+      const branch = value.trim();
+      return branch.length > 0
+        ? Effect.succeed(branch)
+        : Effect.fail("Branch name is required");
+    },
+  }),
+).pipe(Effect.mapError(() => new PickerCancelled({})));
 
 const resolveRepository = (repository: string) =>
   Effect.gen(function* () {

@@ -1,4 +1,5 @@
 import { type Effect, Schema, ServiceMap } from "effect";
+import type { Prompt } from "effect/unstable/cli";
 
 export class PickerError extends Schema.TaggedErrorClass<PickerError>(
   "skipper/PickerError",
@@ -25,7 +26,7 @@ export interface PickerService {
   }) => Effect.Effect<
     string,
     PickerError | PickerCancelled | PickerNoMatch,
-    never
+    Prompt.Environment
   >;
 }
 
