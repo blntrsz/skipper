@@ -38,3 +38,11 @@ test("hello world", () => {
 ```
 
 For more information, read the Bun API docs in `node_modules/bun-types/docs/**.md`.
+
+## Session completion checks
+
+After each coding session, run these commands from the repository root to verify formatting and linting:
+
+- `bun run format`
+- `bun run lint`
+- `bun run check`
