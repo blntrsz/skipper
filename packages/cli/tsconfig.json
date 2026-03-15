@@ -7,5 +7,5 @@
       "@skippercorp/core/*": ["../core/src/*"]
     }
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "test/**/*.ts"]
 }

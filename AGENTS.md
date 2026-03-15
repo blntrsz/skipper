@@ -45,3 +45,9 @@ After each coding session, run these commands from the repository root to verify
 
 - `bun run check:fix`
 ```
+
+# `effect` library
+
+If you need to work out how something works, there are some git submodules you can refer to:
+
+.agents/effect-smol - for the effect libraries

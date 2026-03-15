@@ -27,6 +27,7 @@
   },
   "devDependencies": {
     "@changesets/cli": "^2.30.0",
+    "@faker-js/faker": "^10.3.0",
     "@softarc/sheriff-core": "^0.19.6",
     "@types/bun": "latest",
     "dependency-cruiser": "^17.3.9",

@@ -1,5 +1,5 @@
 import { Task, TaskService } from "@skippercorp/core";
-import { Effect } from "effect";
+import { Console, Effect } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
 
 const taskStateChoices = ["stale", "working", "asking-question", "done"] as const;
@@ -9,10 +9,7 @@ const idFlag = Flag.string("id").pipe(
   Flag.withDescription("Task id"),
 );
 
-const printJson = (value: unknown) =>
-  Effect.sync(() => {
-    process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
-  });
+const printJson = (value: unknown) => Console.log(JSON.stringify(value, null, 2));
 
 const withTaskDependencies = <A, E, R>(effect: Effect.Effect<A, E, R>) => effect;
 

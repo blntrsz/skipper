@@ -1,5 +1,5 @@
 import { BunFileSystem } from "@effect/platform-bun";
-import { SqliteClient, SqliteMigrator } from "@effect/sql-sqlite-bun";
+import { SqliteClient as EffectSqliteClient, SqliteMigrator } from "@effect/sql-sqlite-bun";
 import { Effect, String as EffectString, FileSystem, Layer } from "effect";
 import * as Path from "../domain/Path";
 import { migrations } from "../migrations";
@@ -19,7 +19,7 @@ const makeEnsureDatabaseDirectoryLive = () =>
 export const makeDatabaseLive = () => {
   return Layer.unwrap(
     Effect.sync(() => {
-      const sqliteLive = SqliteClient.layer({
+      const sqliteLive = EffectSqliteClient.layer({
         filename: Path.databasePath(),
         create: true,
         transformQueryNames: EffectString.camelToSnake,
@@ -33,17 +33,14 @@ export const makeDatabaseLive = () => {
   );
 };
 
-export const makeTestDatabaseLive = () => {
-  const sqliteLive = SqliteClient.layer({
-    filename: ":memory:",
-    create: true,
-    transformQueryNames: EffectString.camelToSnake,
-    transformResultNames: EffectString.snakeToCamel,
-  });
-
-  const migratorLive = SqliteMigrator.layer(migratorOptions);
-
-  return migratorLive.pipe(Layer.provideMerge(sqliteLive));
-};
-
-export { SqliteClient };
+export const makeTestDatabaseLive = () =>
+  SqliteMigrator.layer(migratorOptions).pipe(
+    Layer.provideMerge(
+      EffectSqliteClient.layer({
+        filename: ":memory:",
+        create: true,
+        transformQueryNames: EffectString.camelToSnake,
+        transformResultNames: EffectString.snakeToCamel,
+      }),
+    ),
+  );

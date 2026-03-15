@@ -3,13 +3,7 @@ import { runtime } from "@skippercorp/core/Runtime";
 import { Effect } from "effect";
 import { CliError, Command } from "effect/unstable/cli";
 import packageJson from "../package.json";
-import { cloneCommand, sandboxCommand } from "./Sandbox";
-import { SessionCli } from "./Session";
-import { TaskCli } from "./Task";
-
-const command = Command.make("skipper").pipe(
-  Command.withSubcommands([cloneCommand, sandboxCommand, SessionCli, TaskCli]),
-);
+import { command } from "./CommandTree";
 
 const cli = Effect.gen(function* () {
   yield* Command.run(command, {

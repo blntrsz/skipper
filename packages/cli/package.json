@@ -18,7 +18,7 @@
   "scripts": {
     "cli": "bun run ./src/Cli.ts",
     "typecheck": "bun x tsc --noEmit -p tsconfig.json",
-    "test": "bun run typecheck",
+    "test": "bun x --bun vitest run",
     "deps:check": "bun x tsc --noEmit -p tsconfig.json",
     "build": "bun build ./src/Cli.ts --target bun-darwin-arm64 --compile --outfile bin/skipper"
   },
@@ -27,6 +27,8 @@
     "effect": "4.0.0-beta.30"
   },
   "devDependencies": {
-    "@skippercorp/core": "workspace:*"
+    "@effect/vitest": "4.0.0-beta.30",
+    "@skippercorp/core": "workspace:*",
+    "vitest": "4.0.18"
   }
 }
