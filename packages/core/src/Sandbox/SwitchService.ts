@@ -26,12 +26,7 @@ export interface SwitchService {
     readonly create: boolean;
   }) => Effect.Effect<
     void,
-    | PlatformError
-    | UnknownError
-    | PickerCancelled
-    | PickerError
-    | PickerNoMatch
-    | Shell.ShellError,
+    PlatformError | UnknownError | PickerCancelled | PickerError | PickerNoMatch | Shell.ShellError,
     | FileSystem.FileSystem
     | Path.Path
     | typeof Git.GitService.Service

@@ -1,11 +1,12 @@
 import { type Effect, Schema, ServiceMap } from "effect";
 
-export class ShellError extends Schema.TaggedErrorClass<ShellError>(
-  "skipper/ShellError",
-)("ShellError", {
-  message: Schema.String,
-  cause: Schema.optional(Schema.Defect),
-}) {}
+export class ShellError extends Schema.TaggedErrorClass<ShellError>("skipper/ShellError")(
+  "ShellError",
+  {
+    message: Schema.String,
+    cause: Schema.optional(Schema.Defect),
+  },
+) {}
 
 export interface ShellService {
   bool: ({

@@ -3,9 +3,7 @@ import { Model } from "effect/unstable/schema";
 import { ulid } from "ulid";
 import { SessionId } from "./Session";
 
-export const SessionMessageId = Schema.String.pipe(
-  Schema.brand("SessionMessageId"),
-);
+export const SessionMessageId = Schema.String.pipe(Schema.brand("SessionMessageId"));
 export type SessionMessageId = typeof SessionMessageId.Type;
 
 export function generateSessionMessageId(): SessionMessageId {
@@ -19,9 +17,7 @@ export const SessionMessageRole = Schema.Union([
 ]);
 export type SessionMessageRole = typeof SessionMessageRole.Type;
 
-export class SessionMessage extends Model.Class<SessionMessage>(
-  "SessionMessage",
-)({
+export class SessionMessage extends Model.Class<SessionMessage>("SessionMessage")({
   id: Model.GeneratedByApp(SessionMessageId),
   sessionId: SessionId,
   role: SessionMessageRole,

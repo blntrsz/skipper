@@ -43,18 +43,18 @@ skipper sandbox remove --repository repo --branch feature
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `skipper clone <owner/repo>` | Clone repo into `~/.local/share/github/<repo>` |
-| `skipper sandbox add` | Create sandbox resources |
-| `skipper sandbox remove` (or `s rm`) | Remove sandbox resources |
-| `skipper run --repository <repo> "<prompt>"` | Run prompt in a repo |
-| `skipper workflow run` | Pick repo, branch, workflow and run it |
-| `skipper task create` | Create a task |
-| `skipper task list` | List all tasks |
-| `skipper task get --id <id>` | Get task by ID |
-| `skipper task update-state --id <id> --state <state>` | Update task state |
-| `skipper task delete --id <id>` | Delete a task |
+| Command                                               | Description                                    |
+| ----------------------------------------------------- | ---------------------------------------------- |
+| `skipper clone <owner/repo>`                          | Clone repo into `~/.local/share/github/<repo>` |
+| `skipper sandbox add`                                 | Create sandbox resources                       |
+| `skipper sandbox remove` (or `s rm`)                  | Remove sandbox resources                       |
+| `skipper run --repository <repo> "<prompt>"`          | Run prompt in a repo                           |
+| `skipper workflow run`                                | Pick repo, branch, workflow and run it         |
+| `skipper task create`                                 | Create a task                                  |
+| `skipper task list`                                   | List all tasks                                 |
+| `skipper task get --id <id>`                          | Get task by ID                                 |
+| `skipper task update-state --id <id> --state <state>` | Update task state                              |
+| `skipper task delete --id <id>`                       | Delete a task                                  |
 
 ## Workflows
 
@@ -77,10 +77,10 @@ Example workflow:
 ```ts
 export default async function issueTriage(context, { issueNumber }) {
   const details = await context.shell(
-    `gh issue view ${issueNumber} --json number,title,body,comments`
+    `gh issue view ${issueNumber} --json number,title,body,comments`,
   );
   const comment = await context.prompt(
-    `Summarize triage for issue #${issueNumber}: ${details.stdout}`
+    `Summarize triage for issue #${issueNumber}: ${details.stdout}`,
   );
   await context.shell(`gh issue comment ${issueNumber} --body-file -`, {
     stdin: comment,
@@ -92,9 +92,7 @@ Example code-review workflow for current local changes:
 
 ```ts
 export default async function codeReviewWorkflow(context) {
-  const diff = await context.shell(
-    "git diff --cached --no-ext-diff && git diff --no-ext-diff"
-  );
+  const diff = await context.shell("git diff --cached --no-ext-diff && git diff --no-ext-diff");
 
   if (diff.stdout.trim().length === 0) {
     process.stdout.write("No local changes to review.\n");
@@ -109,7 +107,7 @@ export default async function codeReviewWorkflow(context) {
       "Keep feedback concise and actionable.",
       "",
       diff.stdout,
-    ].join("\n")
+    ].join("\n"),
   );
 
   process.stdout.write(`${review.trim()}\n`);

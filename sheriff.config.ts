@@ -20,7 +20,17 @@ export const config: SheriffConfig = {
     "packages/<pkg>/src": "pkg:<pkg>",
   },
   depRules: {
-    root: ["root", "pkg:cli", "pkg:core"],
+    root: [
+      "root",
+      "pkg:cli",
+      "pkg:core",
+      "core:domain",
+      "core:internal",
+      "core:session",
+      "core:task",
+      "core:sandbox",
+      "core:migrations",
+    ],
     "pkg:cli": ["pkg:cli", "pkg:core", "root"],
     "pkg:core": [
       "pkg:core",

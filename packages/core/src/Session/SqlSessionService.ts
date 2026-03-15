@@ -72,12 +72,7 @@ const listMessages: SessionService["listMessages"] = (sessionId) =>
     return yield* repository.listMessages(sessionId);
   });
 
-const addMessage: SessionService["addMessage"] = (
-  sessionId,
-  role,
-  content,
-  nextState,
-) =>
+const addMessage: SessionService["addMessage"] = (sessionId, role, content, nextState) =>
   withSessionTransaction(
     Effect.gen(function* () {
       const repository = yield* SessionRepository;

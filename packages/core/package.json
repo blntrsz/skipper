@@ -2,8 +2,8 @@
   "$schema": "https://json.schemastore.org/package.json",
   "name": "@skippercorp/core",
   "version": "0.0.1",
-  "type": "module",
   "private": true,
+  "type": "module",
   "exports": {
     ".": "./src/index.ts",
     "./*": "./src/*.ts"

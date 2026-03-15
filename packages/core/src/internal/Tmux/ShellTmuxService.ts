@@ -54,9 +54,7 @@ export const ShellTmuxService = ServiceMap.make(TmuxService, {
           process.stderr.write(
             `[tmux:error] attachSession failed: _tag=${e._tag} message=${e.message}\n` +
               `[tmux:error] cause=${
-                e.cause instanceof Error
-                  ? e.cause.message
-                  : String(e.cause ?? "(none)")
+                e.cause instanceof Error ? e.cause.message : String(e.cause ?? "(none)")
               }\n`,
           ),
         ),

@@ -35,9 +35,7 @@ export const makeDatabaseLive = () => {
 
 const databaseLayer = makeDatabaseLive();
 
-export const runMigrations = SqliteMigrator.run(migratorOptions).pipe(
-  Effect.asVoid,
-);
+export const runMigrations = SqliteMigrator.run(migratorOptions).pipe(Effect.asVoid);
 
 export const withDatabase = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   Effect.gen(function* () {

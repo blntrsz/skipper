@@ -1,12 +1,6 @@
 import { Effect, FileSystem, Option, ServiceMap } from "effect";
-import {
-  GitRepository,
-  type GitRepositoryOption,
-} from "../../domain/GitRepository";
-import type {
-  RepositoryPath as RepositoryPathType,
-  WorkTreePath,
-} from "../../domain/Path";
+import { GitRepository, type GitRepositoryOption } from "../../domain/GitRepository";
+import type { RepositoryPath as RepositoryPathType, WorkTreePath } from "../../domain/Path";
 import * as Path from "../../domain/Path";
 import * as Shell from "../Shell";
 import { GitError, GitService } from "./GitService";
@@ -27,15 +21,11 @@ export const ShellGitService = ServiceMap.make(GitService, {
   resolveGitRepository: (git: GitRepositoryOption) =>
     Effect.gen(function* () {
       if (Option.isNone(git.repository)) {
-        return yield* Effect.fail(
-          new GitError({ message: "Missing --repository <name>" }),
-        );
+        return yield* Effect.fail(new GitError({ message: "Missing --repository <name>" }));
       }
 
       if (Option.isNone(git.branch)) {
-        return yield* Effect.fail(
-          new GitError({ message: "Missing --branch <name>" }),
-        );
+        return yield* Effect.fail(new GitError({ message: "Missing --branch <name>" }));
       }
 
       return GitRepository.makeUnsafe({
@@ -46,9 +36,7 @@ export const ShellGitService = ServiceMap.make(GitService, {
   resolveRepositoryName: (repository: Option.Option<string>) =>
     Effect.gen(function* () {
       if (Option.isNone(repository)) {
-        return yield* Effect.fail(
-          new GitError({ message: "Missing --repository <name>" }),
-        );
+        return yield* Effect.fail(new GitError({ message: "Missing --repository <name>" }));
       }
 
       return repository.value;
@@ -78,10 +66,7 @@ export const ShellGitService = ServiceMap.make(GitService, {
         }),
       );
     }),
-  removeWorkTree: (
-    repositoryPath: RepositoryPathType,
-    workTreePath: WorkTreePath,
-  ) =>
+  removeWorkTree: (repositoryPath: RepositoryPathType, workTreePath: WorkTreePath) =>
     Effect.gen(function* () {
       const { $ } = yield* Shell.ShellService;
       yield* $({

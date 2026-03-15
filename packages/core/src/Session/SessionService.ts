@@ -9,11 +9,7 @@ import type * as SessionMessage from "../domain/SessionMessage";
 export interface SessionService {
   create: (
     data: Session.SessionCreate,
-  ) => Effect.Effect<
-    Session.Session,
-    SqlError | SchemaError,
-    SqlClient.SqlClient
-  >;
+  ) => Effect.Effect<Session.Session, SqlError | SchemaError, SqlClient.SqlClient>;
   get: (
     id: Session.SessionId,
   ) => Effect.Effect<
@@ -28,11 +24,7 @@ export interface SessionService {
   >;
   delete: (
     id: Session.SessionId,
-  ) => Effect.Effect<
-    void,
-    NoSuchElementError | SqlError | SchemaError,
-    SqlClient.SqlClient
-  >;
+  ) => Effect.Effect<void, NoSuchElementError | SqlError | SchemaError, SqlClient.SqlClient>;
   listMessages: (
     sessionId: Session.SessionId,
   ) => Effect.Effect<
@@ -60,5 +52,4 @@ export interface SessionService {
   >;
 }
 
-export const SessionService =
-  ServiceMap.Service<SessionService>("SessionService");
+export const SessionService = ServiceMap.Service<SessionService>("SessionService");

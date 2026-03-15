@@ -7,7 +7,7 @@ const verticalSlicePath =
 const sessionSlicePath = "^(?:packages/core/)?src/Session(?:/|$)";
 const taskSlicePath = "^(?:packages/core/)?src/Task(?:/|$)";
 const sandboxSlicePath = "^(?:packages/core/)?src/Sandbox(?:/|$)";
-const cliPath = "^(?:packages/cli/)?src(?:/|$)";
+const cliPath = "^packages/cli/src(?:/|$)";
 
 module.exports = {
   forbidden: [
@@ -44,7 +44,9 @@ module.exports = {
     {
       name: "only-internal-can-import-migrations",
       severity: "error",
-      from: { path: `^(?!${internalPath.slice(1)}).+` },
+      from: {
+        path: `^(?!(?:${internalPath.slice(1)})|(?:${migrationsPath.slice(1)})).+`,
+      },
       to: { path: migrationsPath },
     },
     {

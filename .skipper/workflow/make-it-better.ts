@@ -14,9 +14,7 @@ export default async function makeItBetterWorkflow(context: {
   shell: (command: string) => Promise<{ stdout: string }>;
   prompt: (text: string) => Promise<string>;
 }) {
-  const diff = await context.shell(
-    "git diff --cached --no-ext-diff; git diff --no-ext-diff"
-  );
+  const diff = await context.shell("git diff --cached --no-ext-diff; git diff --no-ext-diff");
 
   if (diff.stdout.trim().length === 0) {
     process.stdout.write("No local changes to review.\n");
@@ -28,22 +26,22 @@ export default async function makeItBetterWorkflow(context: {
       buildReviewPrompt(
         "security reviewer",
         "Focus on security issues, trust boundaries, auth, secrets, injection, data exposure, and unsafe defaults.",
-        diff.stdout
-      )
+        diff.stdout,
+      ),
     ),
     context.prompt(
       buildReviewPrompt(
         "code reviewer",
         "Focus on correctness, regressions, reliability, and meaningful test gaps.",
-        diff.stdout
-      )
+        diff.stdout,
+      ),
     ),
     context.prompt(
       buildReviewPrompt(
         "simplification reviewer",
         "Focus on unnecessary complexity, duplication, and chances to simplify without changing behavior.",
-        diff.stdout
-      )
+        diff.stdout,
+      ),
     ),
   ]);
 
@@ -67,7 +65,7 @@ export default async function makeItBetterWorkflow(context: {
       simplificationReview.trim(),
       "",
       diff.stdout,
-    ].join("\n")
+    ].join("\n"),
   );
 
   process.stdout.write(`${result.trim()}\n`);

@@ -24,8 +24,7 @@ const findTasksByRepository = Effect.gen(function* () {
   return SqlSchema.findAll({
     Request: Schema.Struct({ repository: Schema.String }),
     Result: Task,
-    execute: ({ repository }) =>
-      sql`SELECT * FROM tasks WHERE repository = ${repository}`,
+    execute: ({ repository }) => sql`SELECT * FROM tasks WHERE repository = ${repository}`,
   });
 });
 

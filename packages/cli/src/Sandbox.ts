@@ -12,10 +12,7 @@ const flags = {
       ),
     ),
     branch: Flag.optional(
-      Flag.string("branch").pipe(
-        Flag.withAlias("branchname"),
-        Flag.withDescription("Git branch"),
-      ),
+      Flag.string("branch").pipe(Flag.withAlias("branchname"), Flag.withDescription("Git branch")),
     ),
   },
 };
@@ -35,20 +32,13 @@ export const cloneCommand = Command.make(
 
       yield* Effect.tryPromise({
         try: async () => {
-          const result = await Bun.$`${[
-            "gh",
-            "repo",
-            "clone",
-            input.repository,
-          ]}`
+          const result = await Bun.$`${["gh", "repo", "clone", input.repository]}`
             .cwd(Path.repositoryRoot())
             .env(process.env)
             .nothrow();
 
           if (result.exitCode !== 0) {
-            throw new Error(
-              result.stderr.toString().trim() || "gh repo clone failed",
-            );
+            throw new Error(result.stderr.toString().trim() || "gh repo clone failed");
           }
         },
         catch: (cause) =>
@@ -87,19 +77,14 @@ export const removeCommand = Command.make("remove", flags, (config) =>
       Path.GitRepositoryOption.makeUnsafe(config.git),
     );
   }),
-).pipe(
-  Command.withAlias("rm"),
-  Command.withDescription("Remove sandbox resources"),
-);
+).pipe(Command.withAlias("rm"), Command.withDescription("Remove sandbox resources"));
 
 const switchCommand = Command.make(
   "switch",
   {
     repository: flags.git.repository,
     branch: flags.git.branch,
-    create: Flag.boolean("create").pipe(
-      Flag.withDescription("Create new branch and switch"),
-    ),
+    create: Flag.boolean("create").pipe(Flag.withDescription("Create new branch and switch")),
   },
   (input) =>
     Effect.gen(function* () {
@@ -109,15 +94,11 @@ const switchCommand = Command.make(
     }).pipe(
       Effect.catchIf(
         (error): error is Picker.PickerCancelled | Picker.PickerNoMatch =>
-          error instanceof Picker.PickerCancelled ||
-          error instanceof Picker.PickerNoMatch,
+          error instanceof Picker.PickerCancelled || error instanceof Picker.PickerNoMatch,
         () => Effect.void,
       ),
     ),
-).pipe(
-  Command.withAlias("sw"),
-  Command.withDescription("Pick repo and branch, then switch tmux"),
-);
+).pipe(Command.withAlias("sw"), Command.withDescription("Pick repo and branch, then switch tmux"));
 
 export const sandboxCommand = Command.make("sandbox").pipe(
   Command.withAlias("s"),

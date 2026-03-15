@@ -1,20 +1,22 @@
 import { type Effect, Schema, ServiceMap } from "effect";
 import type { Prompt } from "effect/unstable/cli";
 
-export class PickerError extends Schema.TaggedErrorClass<PickerError>(
-  "skipper/PickerError",
-)("PickerError", {
-  message: Schema.String,
-  cause: Schema.optional(Schema.Defect),
-}) {}
+export class PickerError extends Schema.TaggedErrorClass<PickerError>("skipper/PickerError")(
+  "PickerError",
+  {
+    message: Schema.String,
+    cause: Schema.optional(Schema.Defect),
+  },
+) {}
 
 export class PickerCancelled extends Schema.TaggedErrorClass<PickerCancelled>(
   "skipper/PickerCancelled",
 )("PickerCancelled", {}) {}
 
-export class PickerNoMatch extends Schema.TaggedErrorClass<PickerNoMatch>(
-  "skipper/PickerNoMatch",
-)("PickerNoMatch", { query: Schema.String }) {}
+export class PickerNoMatch extends Schema.TaggedErrorClass<PickerNoMatch>("skipper/PickerNoMatch")(
+  "PickerNoMatch",
+  { query: Schema.String },
+) {}
 
 export interface PickerService {
   pick: ({
@@ -23,11 +25,7 @@ export interface PickerService {
   }: {
     options: string[];
     message: string;
-  }) => Effect.Effect<
-    string,
-    PickerError | PickerCancelled | PickerNoMatch,
-    Prompt.Environment
-  >;
+  }) => Effect.Effect<string, PickerError | PickerCancelled | PickerNoMatch, Prompt.Environment>;
 }
 
 export const PickerService = ServiceMap.Service<PickerService>("PickerService");

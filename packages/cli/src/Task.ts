@@ -3,12 +3,7 @@ import { withDatabase } from "@skippercorp/core/Runtime";
 import { Effect } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
 
-const taskStateChoices = [
-  "stale",
-  "working",
-  "asking-question",
-  "done",
-] as const;
+const taskStateChoices = ["stale", "working", "asking-question", "done"] as const;
 
 const idFlag = Flag.string("id").pipe(
   Flag.withSchema(Task.TaskId),
@@ -20,18 +15,13 @@ const printJson = (value: unknown) =>
     process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
   });
 
-const withTaskDependencies = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-  withDatabase(effect);
+const withTaskDependencies = <A, E, R>(effect: Effect.Effect<A, E, R>) => withDatabase(effect);
 
 const createCommand = Command.make(
   "create",
   {
-    description: Flag.string("description").pipe(
-      Flag.withDescription("Task description"),
-    ),
-    repository: Flag.string("repository").pipe(
-      Flag.withDescription("Repository name"),
-    ),
+    description: Flag.string("description").pipe(Flag.withDescription("Task description")),
+    repository: Flag.string("repository").pipe(Flag.withDescription("Repository name")),
     branch: Flag.string("branch").pipe(Flag.withDescription("Branch name")),
   },
   (input) =>
@@ -68,9 +58,7 @@ const listCommand = Command.make("list", {}, () =>
 const listByRepositoryCommand = Command.make(
   "list-by-repository",
   {
-    repository: Flag.string("repository").pipe(
-      Flag.withDescription("Repository name"),
-    ),
+    repository: Flag.string("repository").pipe(Flag.withDescription("Repository name")),
   },
   (input) =>
     Effect.gen(function* () {
@@ -85,9 +73,7 @@ const updateStateCommand = Command.make(
   "update-state",
   {
     id: idFlag,
-    state: Flag.choice("state", taskStateChoices).pipe(
-      Flag.withDescription("Task state"),
-    ),
+    state: Flag.choice("state", taskStateChoices).pipe(Flag.withDescription("Task state")),
   },
   (input) =>
     Effect.gen(function* () {

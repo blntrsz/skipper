@@ -25,9 +25,7 @@ const remove: SandboxService["remove"] = (config, git) =>
     const gitRepository = yield* gitService.resolveGitRepository(git);
 
     yield* WorkTreeSandbox.remove(gitRepository);
-    yield* Effect.logInfo(
-      `Sandbox removed for ${gitRepository.repository} (${config.type})`,
-    );
+    yield* Effect.logInfo(`Sandbox removed for ${gitRepository.repository} (${config.type})`);
   });
 
 export const TmuxWorkTreeSandboxService = ServiceMap.make(SandboxService, {

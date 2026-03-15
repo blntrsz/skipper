@@ -9,14 +9,11 @@ const BaseSessionRepository = SqlModel.makeRepository(Session.Session, {
   spanPrefix: "SessionRepository",
 });
 
-const BaseSessionMessageRepository = SqlModel.makeRepository(
-  SessionMessage.SessionMessage,
-  {
-    idColumn: "id",
-    tableName: "session_messages",
-    spanPrefix: "SessionMessageRepository",
-  },
-);
+const BaseSessionMessageRepository = SqlModel.makeRepository(SessionMessage.SessionMessage, {
+  idColumn: "id",
+  tableName: "session_messages",
+  spanPrefix: "SessionMessageRepository",
+});
 
 const listSessions = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
@@ -24,8 +21,7 @@ const listSessions = Effect.gen(function* () {
   return SqlSchema.findAll({
     Request: Schema.Void,
     Result: Session.Session,
-    execute: () =>
-      sql`SELECT * FROM sessions ORDER BY updated_at DESC, id DESC`,
+    execute: () => sql`SELECT * FROM sessions ORDER BY updated_at DESC, id DESC`,
   });
 });
 
@@ -49,9 +45,7 @@ const deleteMessagesBySessionId = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
 
   return (sessionId: Session.SessionId) =>
-    sql`DELETE FROM session_messages WHERE session_id = ${sessionId}`.pipe(
-      Effect.asVoid,
-    );
+    sql`DELETE FROM session_messages WHERE session_id = ${sessionId}`.pipe(Effect.asVoid);
 });
 
 export const SessionRepository = Effect.gen(function* () {
@@ -67,7 +61,6 @@ export const SessionRepository = Effect.gen(function* () {
     listMessages: (sessionId: Session.SessionId) => findMessages({ sessionId }),
     insertMessage: (message: SessionMessage.SessionMessage) =>
       sessionMessageRepository.insertVoid(message),
-    deleteMessagesBySessionId: (sessionId: Session.SessionId) =>
-      deleteMessages(sessionId),
+    deleteMessagesBySessionId: (sessionId: Session.SessionId) => deleteMessages(sessionId),
   } as const;
 });

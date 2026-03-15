@@ -2,18 +2,18 @@
   "$schema": "https://json.schemastore.org/package.json",
   "name": "@skippercorp/skipper-cli",
   "version": "0.0.2",
-  "type": "module",
   "private": false,
-  "publishConfig": {
-    "access": "public"
+  "bin": {
+    "sk": "./bin/skipper"
   },
   "files": [
     "bin/**/*",
     "src/**/*.ts",
     "!src/**/*.test.ts"
   ],
-  "bin": {
-    "sk": "./bin/skipper"
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "cli": "bun run ./src/Cli.ts",

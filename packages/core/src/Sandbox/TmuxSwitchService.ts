@@ -3,24 +3,15 @@ import { Effect, FileSystem, Option, ServiceMap } from "effect";
 import { UnknownError } from "effect/Cause";
 import { Prompt } from "effect/unstable/cli";
 import * as Path from "../domain/Path";
-import {
-  type GitRepository,
-  GitRepository as GitRepositorySchema,
-} from "../domain/Path";
+import { type GitRepository, GitRepository as GitRepositorySchema } from "../domain/Path";
 import { Git, Tmux } from "../internal";
-import {
-  PickerCancelled,
-  PickerService,
-} from "../internal/Picker/PickerService";
+import { PickerCancelled, PickerService } from "../internal/Picker/PickerService";
 import { SwitchService } from "./SwitchService";
 
 const isInteractive = () =>
-  process.stdin.isTTY === true &&
-  process.stdout.isTTY === true &&
-  process.env.CI === undefined;
+  process.stdin.isTTY === true && process.stdout.isTTY === true && process.env.CI === undefined;
 
-const hasTerminal = () =>
-  process.stdin.isTTY === true && process.stdout.isTTY === true;
+const hasTerminal = () => process.stdin.isTTY === true && process.stdout.isTTY === true;
 
 const pathExists = (path: string) =>
   Effect.gen(function* () {
@@ -33,20 +24,14 @@ const listDirectoryNames = (path: string) =>
     const fs = yield* FileSystem.FileSystem;
     const entries = yield* fs.readDirectory(path).pipe(
       Effect.catchTag("PlatformError", (error) =>
-        error.reason._tag === "NotFound"
-          ? Effect.succeed([])
-          : Effect.fail(error),
+        error.reason._tag === "NotFound" ? Effect.succeed([]) : Effect.fail(error),
       ),
-      Effect.mapError(
-        (error) => new UnknownError(error, `Failed to list '${path}'`),
-      ),
+      Effect.mapError((error) => new UnknownError(error, `Failed to list '${path}'`)),
     );
     const values = yield* Effect.forEach(entries, (entry) =>
       fs.stat(join(path, entry)).pipe(
         Effect.map((stats) => (stats.type === "Directory" ? entry : null)),
-        Effect.mapError(
-          (error) => new UnknownError(error, `Failed to list '${path}'`),
-        ),
+        Effect.mapError((error) => new UnknownError(error, `Failed to list '${path}'`)),
       ),
     );
 
@@ -66,13 +51,9 @@ const listWorkTreePaths = (path: string) =>
       Effect.gen(function* () {
         const entries = yield* fs.readDirectory(directory).pipe(
           Effect.catchTag("PlatformError", (error) =>
-            error.reason._tag === "NotFound"
-              ? Effect.succeed([])
-              : Effect.fail(error),
+            error.reason._tag === "NotFound" ? Effect.succeed([]) : Effect.fail(error),
           ),
-          Effect.mapError(
-            (error) => new UnknownError(error, `Failed to list '${directory}'`),
-          ),
+          Effect.mapError((error) => new UnknownError(error, `Failed to list '${directory}'`)),
         );
         const values = yield* Effect.forEach(entries, (entry) =>
           Effect.gen(function* () {
@@ -81,8 +62,7 @@ const listWorkTreePaths = (path: string) =>
               .stat(entryPath)
               .pipe(
                 Effect.mapError(
-                  (error) =>
-                    new UnknownError(error, `Failed to list '${directory}'`),
+                  (error) => new UnknownError(error, `Failed to list '${directory}'`),
                 ),
               );
 
@@ -95,14 +75,11 @@ const listWorkTreePaths = (path: string) =>
               .exists(join(entryPath, ".git"))
               .pipe(
                 Effect.mapError(
-                  (error) =>
-                    new UnknownError(error, `Failed to list '${entryPath}'`),
+                  (error) => new UnknownError(error, `Failed to list '${entryPath}'`),
                 ),
               );
 
-            return isWorkTree
-              ? [nextParts.join("/")]
-              : yield* walk(entryPath, nextParts);
+            return isWorkTree ? [nextParts.join("/")] : yield* walk(entryPath, nextParts);
           }),
         );
 
@@ -126,9 +103,7 @@ export const sortBranches = (branches: ReadonlyArray<string>) =>
   });
 
 export const makeSessionName = (repository: string, branch: string) => {
-  return `${Path.sanitizeNameSegment(repository)}-${Path.sanitizeNameSegment(
-    branch,
-  )}`;
+  return `${Path.sanitizeNameSegment(repository)}-${Path.sanitizeNameSegment(branch)}`;
 };
 
 export const resolveTargetPath = (repository: string, branch: string) =>
@@ -163,37 +138,25 @@ export const listBranches = (
     const repositoryPath = join(repositoryRoot, repository);
     const repositoryExists = yield* pathExists(repositoryPath).pipe(
       Effect.mapError(
-        (error) =>
-          new UnknownError(error, `Failed to read repository '${repository}'`),
+        (error) => new UnknownError(error, `Failed to read repository '${repository}'`),
       ),
     );
 
     if (!repositoryExists) {
       return yield* Effect.fail(
-        new UnknownError(
-          undefined,
-          `Repository '${repository}' not found in '${repositoryRoot}'`,
-        ),
+        new UnknownError(undefined, `Repository '${repository}' not found in '${repositoryRoot}'`),
       );
     }
 
-    const branches = yield* listWorkTreePaths(
-      join(workTreeRoot, repository),
-    ).pipe(
+    const branches = yield* listWorkTreePaths(join(workTreeRoot, repository)).pipe(
       Effect.mapError(
-        (error) =>
-          new UnknownError(
-            error,
-            `Failed to list branches for '${repository}'`,
-          ),
+        (error) => new UnknownError(error, `Failed to list branches for '${repository}'`),
       ),
     );
 
     return sortBranches([
       "main",
-      ...branches.map((path) =>
-        Path.workTreeRelativePathToBranch(repository, path),
-      ),
+      ...branches.map((path) => Path.workTreeRelativePathToBranch(repository, path)),
     ]);
   });
 
@@ -212,9 +175,7 @@ const promptForBranchName = Prompt.run(
     message: "Branch name",
     validate: (value) => {
       const branch = value.trim();
-      return branch.length > 0
-        ? Effect.succeed(branch)
-        : Effect.fail("Branch name is required");
+      return branch.length > 0 ? Effect.succeed(branch) : Effect.fail("Branch name is required");
     },
   }),
 ).pipe(Effect.mapError(() => new PickerCancelled({})));
@@ -242,12 +203,7 @@ const resolveBranch = (
 ) =>
   availableBranches.includes(branch)
     ? Effect.succeed(branch)
-    : Effect.fail(
-        new UnknownError(
-          undefined,
-          `Branch '${branch}' not found for '${repository}'`,
-        ),
-      );
+    : Effect.fail(new UnknownError(undefined, `Branch '${branch}' not found for '${repository}'`));
 
 const run: SwitchService["run"] = (input) =>
   Effect.gen(function* () {
@@ -265,10 +221,7 @@ const run: SwitchService["run"] = (input) =>
             const repositories = yield* listRepositories();
             if (repositories.length === 0) {
               return yield* Effect.fail(
-                new UnknownError(
-                  undefined,
-                  `No repositories found in '${Path.repositoryRoot()}'`,
-                ),
+                new UnknownError(undefined, `No repositories found in '${Path.repositoryRoot()}'`),
               );
             }
             return yield* picker.pick({
@@ -304,10 +257,7 @@ const run: SwitchService["run"] = (input) =>
 
       const targetPath = resolveTargetPath(repository, branch);
       const tmux = yield* Tmux.TmuxService;
-      yield* tmux.attachSession(
-        makeSessionName(repository, branch),
-        targetPath,
-      );
+      yield* tmux.attachSession(makeSessionName(repository, branch), targetPath);
       return;
     }
 
@@ -326,11 +276,7 @@ const run: SwitchService["run"] = (input) =>
     const targetPath = resolveTargetPath(repository, branch);
     const targetExists = yield* pathExists(targetPath).pipe(
       Effect.mapError(
-        (error) =>
-          new UnknownError(
-            error,
-            `Failed to resolve path for '${repository}:${branch}'`,
-          ),
+        (error) => new UnknownError(error, `Failed to resolve path for '${repository}:${branch}'`),
       ),
     );
 

@@ -11,18 +11,10 @@ export interface TaskService {
   ) => Effect.Effect<Task.Task, SqlError | SchemaError, SqlClient.SqlClient>;
   get: (
     id: Task.TaskId,
-  ) => Effect.Effect<
-    Task.Task,
-    NoSuchElementError | SqlError | SchemaError,
-    SqlClient.SqlClient
-  >;
+  ) => Effect.Effect<Task.Task, NoSuchElementError | SqlError | SchemaError, SqlClient.SqlClient>;
   getByRepository: (
     repo: string,
-  ) => Effect.Effect<
-    ReadonlyArray<Task.Task>,
-    SqlError | SchemaError,
-    SqlClient.SqlClient
-  >;
+  ) => Effect.Effect<ReadonlyArray<Task.Task>, SqlError | SchemaError, SqlClient.SqlClient>;
   getAll: () => Effect.Effect<
     ReadonlyArray<Task.Task>,
     SqlError | SchemaError,
@@ -31,18 +23,10 @@ export interface TaskService {
   update: (
     id: Task.TaskId,
     state: Task.TaskState,
-  ) => Effect.Effect<
-    Task.Task,
-    NoSuchElementError | SqlError | SchemaError,
-    SqlClient.SqlClient
-  >;
+  ) => Effect.Effect<Task.Task, NoSuchElementError | SqlError | SchemaError, SqlClient.SqlClient>;
   delete: (
     id: Task.TaskId,
-  ) => Effect.Effect<
-    void,
-    NoSuchElementError | SqlError | SchemaError,
-    SqlClient.SqlClient
-  >;
+  ) => Effect.Effect<void, NoSuchElementError | SqlError | SchemaError, SqlClient.SqlClient>;
 }
 
 export const TaskService = ServiceMap.Service<TaskService>("TaskService");

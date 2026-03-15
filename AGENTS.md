@@ -43,6 +43,5 @@ For more information, read the Bun API docs in `node_modules/bun-types/docs/**.m
 
 After each coding session, run these commands from the repository root to verify formatting and linting:
 
-- `bun run format`
-- `bun run lint`
-- `bun run check`
+- `bun run check:fix`
+```
