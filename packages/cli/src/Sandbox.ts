@@ -1,7 +1,9 @@
-import { Path, Picker, SandboxService, SwitchService } from "@skippercorp/core";
+import { Path, Picker, SandboxService, SwitchService, listBranches } from "@skippercorp/core";
 import { Effect, FileSystem } from "effect";
+import { UnknownError } from "effect/Cause";
 import { systemError } from "effect/PlatformError";
-import { Argument, Command, Flag } from "effect/unstable/cli";
+import { Argument, Command, Flag, Prompt } from "effect/unstable/cli";
+import { join } from "node:path";
 
 const flags = {
   git: {
@@ -100,8 +102,104 @@ const switchCommand = Command.make(
     ),
 ).pipe(Command.withAlias("sw"), Command.withDescription("Pick repo and branch, then switch tmux"));
 
+const promptForShellCommand = Prompt.run(
+  Prompt.text({
+    message: "Shell command",
+    validate: (value) => {
+      const command = value.trim();
+      return command.length > 0 ? Effect.succeed(command) : Effect.fail("Command is required");
+    },
+  }),
+).pipe(Effect.mapError(() => new Picker.PickerCancelled({})));
+
+const listGitRepositories = () =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const root = Path.repositoryRoot();
+    const entries = yield* fs.readDirectory(root).pipe(
+      Effect.catchTag("PlatformError", (error) =>
+        error.reason._tag === "NotFound" ? Effect.succeed([]) : Effect.fail(error),
+      ),
+      Effect.mapError((error) => new UnknownError(error, `Failed to list repositories in '${root}'`)),
+    );
+
+    const checks = yield* Effect.forEach(entries, (entry) =>
+      Effect.gen(function* () {
+        const entryPath = join(root, entry);
+        const stats = yield* fs.stat(entryPath).pipe(
+          Effect.mapError((error) => new UnknownError(error, `Failed to inspect '${entryPath}'`)),
+        );
+
+        if (stats.type !== "Directory") {
+          return null;
+        }
+
+        const hasGit = yield* fs.exists(join(entryPath, ".git")).pipe(
+          Effect.mapError((error) => new UnknownError(error, `Failed to inspect '${entryPath}'`)),
+        );
+
+        return hasGit ? entry : null;
+      }),
+    );
+
+    return checks
+      .filter((entry): entry is string => entry !== null)
+      .sort((left, right) => left.localeCompare(right));
+  });
+
+const runCommand = Command.make("run", {}, () =>
+  Effect.gen(function* () {
+    const picker = yield* Picker.PickerService;
+
+    const repositories = yield* listGitRepositories();
+    if (repositories.length === 0) {
+      return yield* Effect.fail(
+        new UnknownError(undefined, `No repositories found in '${Path.repositoryRoot()}'`),
+      );
+    }
+
+    const repository = yield* picker.pick({ message: "Repository", options: repositories });
+    const branches = yield* listBranches(repository);
+    const branch = yield* picker.pick({ message: "Branch", options: [...branches] });
+    const shellCommand = yield* promptForShellCommand;
+
+    const targetPath = Path.resolveWorkspacePath({ repository, branch });
+    const fs = yield* FileSystem.FileSystem;
+    const exists = yield* fs.exists(targetPath).pipe(
+      Effect.mapError((error) => new UnknownError(error, `Failed to inspect '${targetPath}'`)),
+    );
+
+    if (!exists) {
+      return yield* Effect.fail(
+        new UnknownError(undefined, `Target path '${targetPath}' not found for '${repository}:${branch}'`),
+      );
+    }
+
+    const result = yield* Effect.tryPromise({
+      try: async () =>
+        Bun.$`${{ raw: shellCommand }}`
+          .cwd(targetPath)
+          .env(process.env)
+          .nothrow(),
+      catch: (error) => new UnknownError(error, `Failed to execute command in '${targetPath}'`),
+    });
+
+    if (result.exitCode !== 0) {
+      return yield* Effect.fail(
+        new UnknownError(undefined, result.stderr.toString().trim() || "Shell command failed"),
+      );
+    }
+  }).pipe(
+    Effect.catchIf(
+      (error): error is Picker.PickerCancelled | Picker.PickerNoMatch =>
+        error instanceof Picker.PickerCancelled || error instanceof Picker.PickerNoMatch,
+      () => Effect.void,
+    ),
+  ),
+).pipe(Command.withDescription("Pick repo and branch, then run a shell command in that worktree"));
+
 export const sandboxCommand = Command.make("sandbox").pipe(
   Command.withAlias("s"),
   Command.withDescription("Manage sandboxes"),
-  Command.withSubcommands([addCommand, removeCommand, switchCommand]),
+  Command.withSubcommands([addCommand, removeCommand, switchCommand, runCommand]),
 );
