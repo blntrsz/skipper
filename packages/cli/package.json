@@ -1,7 +1,7 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
   "name": "@skippercorp/skipper-cli",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "private": false,
   "bin": {
     "sk": "./bin/skipper"
