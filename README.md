@@ -2,13 +2,27 @@
   <img src="docs/skipper-logo.png" alt="Skipper logo" width="220" />
 </p>
 
-<h1 align="center">@skippercorp/skipper-cli</h1>
+<h1 align="center">Skipper</h1>
 
 <p align="center">
-  Fast local worktree flow + task management CLI.
+  Local repo workspace CLI for Git worktrees + tmux.
 </p>
 
-Workflows can be defined per user in `~/.config/skipper/workflow/*.ts` or per workspace in `.skipper/workflow/*.ts`.
+Skipper is a local-first CLI for working across GitHub repositories and branch workspaces without juggling paths by hand. It clones repositories into a shared local root, creates per-branch Git worktrees, opens or switches into matching tmux sessions, and runs shell commands in the right checkout.
+
+By default, Skipper keeps:
+
+- repositories in `~/.local/share/github/<repo>`
+- non-`main` worktrees in `~/.local/share/skipper/worktree/<repo>/<repo>.<branch>`
+
+If you omit `--repository` or `--branch` in an interactive terminal, Skipper lets you pick them.
+
+## Requirements
+
+- `bun`
+- `git`
+- `gh`
+- `tmux`
 
 ## Install
 
@@ -16,138 +30,37 @@ Workflows can be defined per user in `~/.config/skipper/workflow/*.ts` or per wo
 bun add -g @skippercorp/skipper-cli
 ```
 
+This installs the `sk` command.
+
 Or run without installing:
 
 ```bash
 bunx @skippercorp/skipper-cli --help
 ```
 
-## Quick start
+## Getting started
 
 ```bash
-# Clone a repo
-skipper clone owner/repo
+# Clone into ~/.local/share/github/<repo>
+sk clone owner/repo
 
-# Create sandbox resources
-skipper sandbox add --repository repo --branch feature
+# Create a worktree for a feature branch
+sk sandbox add --repository repo --branch feature/my-change
 
-# Run a prompt in a repo
-skipper run --repository repo "fix typo in README"
+# Jump into a tmux session for that workspace
+sk sandbox switch --repository repo --branch feature/my-change
 
-# Pick repo, branch, then workflow
-skipper workflow run
-
-# Remove sandbox resources
-skipper sandbox remove --repository repo --branch feature
+# Run a shell command in that same workspace
+sk sandbox run --repository repo --branch feature/my-change --command "bun test"
 ```
 
-## Commands
-
-| Command                                               | Description                                    |
-| ----------------------------------------------------- | ---------------------------------------------- |
-| `skipper clone <owner/repo>`                          | Clone repo into `~/.local/share/github/<repo>` |
-| `skipper sandbox add`                                 | Create sandbox resources                       |
-| `skipper sandbox remove` (or `s rm`)                  | Remove sandbox resources                       |
-| `skipper run --repository <repo> "<prompt>"`          | Run prompt in a repo                           |
-| `skipper workflow run`                                | Pick repo, branch, workflow and run it         |
-| `skipper task create`                                 | Create a task                                  |
-| `skipper task list`                                   | List all tasks                                 |
-| `skipper task get --id <id>`                          | Get task by ID                                 |
-| `skipper task update-state --id <id> --state <state>` | Update task state                              |
-| `skipper task delete --id <id>`                       | Delete a task                                  |
-
-## Workflows
-
-Workflow files are TypeScript modules discovered from:
-
-```text
-~/.config/skipper/workflow/*.ts
-~/.local/share/github/my-repo/.skipper/workflow/*.ts
-~/.local/share/skipper/worktree/my-repo/my-repo.feature/.skipper/workflow/*.ts
-```
-
-- `skipper workflow run` uses pickers: repository -> branch -> workflow
-- workflow name comes from the filename stem
-- if user + repo/worktree have same workflow name, repo/worktree wins
-- workflows run with `bun`
-- repo/worktree workflow lookup uses the selected workspace path
-
-Example workflow:
-
-```ts
-export default async function issueTriage(context, { issueNumber }) {
-  const details = await context.shell(
-    `gh issue view ${issueNumber} --json number,title,body,comments`,
-  );
-  const comment = await context.prompt(
-    `Summarize triage for issue #${issueNumber}: ${details.stdout}`,
-  );
-  await context.shell(`gh issue comment ${issueNumber} --body-file -`, {
-    stdin: comment,
-  });
-}
-```
-
-Example code-review workflow for current local changes:
-
-```ts
-export default async function codeReviewWorkflow(context) {
-  const diff = await context.shell("git diff --cached --no-ext-diff && git diff --no-ext-diff");
-
-  if (diff.stdout.trim().length === 0) {
-    process.stdout.write("No local changes to review.\n");
-    return;
-  }
-
-  const review = await context.prompt(
-    [
-      "Review these local git changes. Staged diff comes first, then unstaged diff.",
-      "Only report major or minor issues: correctness, regressions, security, reliability, and meaningful test gaps.",
-      "Ignore style-only feedback and nitpicks.",
-      "Keep feedback concise and actionable.",
-      "",
-      diff.stdout,
-    ].join("\n"),
-  );
-
-  process.stdout.write(`${review.trim()}\n`);
-}
-```
-
-Optional input:
-
-```bash
-skipper workflow run --input '{"issueNumber":123}'
-```
-
-Workflow host API in V1:
-
-- `context.shell(command, { stdin? })` returns `{ stdout, stderr, exitCode }`
-- `context.prompt(text)` runs the configured agent command and returns stdout
-
-## Requirements
-
-- `bun`
-- `git`
-- `gh` (GitHub CLI)
-- `tmux`
+`main` is treated specially: it uses the repository checkout directly, while other branches use dedicated worktrees.
 
 ## Development
 
 ```bash
 bun install
 bun run cli -- --help
-bun run format
-bun run lint
-bun run check
+bun run check:fix
 bun test
-```
-
-## Release
-
-Uses Changesets for versioning:
-
-```bash
-bun run changeset  # Add changeset
-bun run release  # Publish to npm
 ```
