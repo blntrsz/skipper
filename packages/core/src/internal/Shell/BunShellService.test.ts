@@ -14,6 +14,28 @@ const run = (command: string, options?: { cwd?: string }) =>
     }).pipe(Effect.provide(Layer.effectServices(Effect.succeed(BunShellService)))),
   );
 
+const bool = (command: string) =>
+  Effect.runPromise(
+    Effect.gen(function* () {
+      const shell = yield* Shell.ShellService;
+      return yield* shell.bool({ command, errorMessage: "bool failed" });
+    }).pipe(Effect.provide(Layer.effectServices(Effect.succeed(BunShellService)))),
+  );
+
+describe("BunShellService.bool", () => {
+  test("supports shell builtins with redirects", async () => {
+    const result = await bool("command -v sh >/dev/null 2>&1");
+
+    expect(result).toBe(true);
+  });
+
+  test("returns false for non-zero exit codes", async () => {
+    const result = await bool("exit 7");
+
+    expect(result).toBe(false);
+  });
+});
+
 describe("BunShellService.run", () => {
   test("returns exact non-zero exit code", async () => {
     const result = await run("exit 7");

@@ -1,35 +1,32 @@
 import { Effect, ServiceMap } from "effect";
 import { ShellError, ShellService } from "./ShellService";
 
+const unknownShellErrorMessage = "An unknown error occurred while executing the shell command.";
+
+const makeShellError = (cause: unknown, errorMessage?: string) =>
+  new ShellError({
+    message: errorMessage ?? (cause as Error)?.message ?? unknownShellErrorMessage,
+    cause,
+  });
+
 export const BunShellService = ServiceMap.make(ShellService, {
   bool: ({ command, errorMessage }) => {
-    return Effect.tryPromise({
-      try: async () =>
-        Bun.$`${{ raw: command }}`
-          .env(process.env)
-          .nothrow()
-          .then((result) => result.exitCode === 0),
-      catch: (cause) =>
-        new ShellError({
-          message:
-            errorMessage ??
-            (cause as Error)?.message ??
-            "An unknown error occurred while executing the shell command.",
-          cause,
-        }),
+    return Effect.try({
+      try: () =>
+        Bun.spawnSync({
+          cmd: ["/bin/bash", "-lc", command],
+          stdin: 0,
+          stdout: "ignore",
+          stderr: "ignore",
+          env: process.env,
+        }).exitCode === 0,
+      catch: (cause) => makeShellError(cause, errorMessage),
     });
   },
   $: ({ command, errorMessage }) => {
     return Effect.tryPromise({
       try: async () => Bun.$`${{ raw: command }}`.env(process.env).text(),
-      catch: (cause) =>
-        new ShellError({
-          message:
-            errorMessage ??
-            (cause as Error)?.message ??
-            "An unknown error occurred while executing the shell command.",
-          cause,
-        }),
+      catch: (cause) => makeShellError(cause, errorMessage),
     });
   },
   exec: ({ command, errorMessage }) => {
@@ -49,13 +46,7 @@ export const BunShellService = ServiceMap.make(ShellService, {
       catch: (cause) => {
         console.log(cause);
         if (cause instanceof ShellError) return cause;
-        return new ShellError({
-          message:
-            errorMessage ??
-            (cause as Error)?.message ??
-            "An unknown error occurred while executing the shell command.",
-          cause,
-        });
+        return makeShellError(cause, errorMessage);
       },
     });
   },
@@ -76,13 +67,6 @@ export const BunShellService = ServiceMap.make(ShellService, {
 
         return result.exitCode;
       },
-      catch: (cause) =>
-        new ShellError({
-          message:
-            errorMessage ??
-            (cause as Error)?.message ??
-            "An unknown error occurred while executing the shell command.",
-          cause,
-        }),
+      catch: (cause) => makeShellError(cause, errorMessage),
     }),
 });
