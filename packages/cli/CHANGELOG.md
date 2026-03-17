@@ -1,5 +1,11 @@
 # @skippercorp/skipper-cli
 
+## 0.0.4
+
+### Patch Changes
+
+- 969b3a0: Fix sandbox switch tmux detection when shell checks use redirects, so `sk s sw` can attach sessions again.
+
 ## 0.0.3
 
 ### Patch Changes
