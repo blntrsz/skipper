@@ -59,4 +59,30 @@ export const BunShellService = ServiceMap.make(ShellService, {
       },
     });
   },
+  run: ({ command, cwd, env, errorMessage }) =>
+    Effect.try({
+      try: () => {
+        const result = Bun.spawnSync({
+          cmd: ["/bin/bash", "-lc", command],
+          cwd,
+          stdin: 0,
+          stdout: 1,
+          stderr: 2,
+          env: {
+            ...process.env,
+            ...env,
+          },
+        });
+
+        return result.exitCode;
+      },
+      catch: (cause) =>
+        new ShellError({
+          message:
+            errorMessage ??
+            (cause as Error)?.message ??
+            "An unknown error occurred while executing the shell command.",
+          cause,
+        }),
+    }),
 });

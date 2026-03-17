@@ -1,4 +1,11 @@
-import { Path, Picker, Sandbox, SandboxService, SwitchService } from "@skippercorp/core";
+import {
+  Path,
+  Picker,
+  RunService,
+  Sandbox,
+  SandboxService,
+  SwitchService,
+} from "@skippercorp/core";
 import { Effect, FileSystem } from "effect";
 import { Argument, Command, Flag } from "effect/unstable/cli";
 
@@ -123,8 +130,31 @@ const switchCommand = Command.make(
     ),
 ).pipe(Command.withAlias("sw"), Command.withDescription("Pick repo and branch, then switch tmux"));
 
+const runCommand = Command.make(
+  "run",
+  {
+    repository: flags.git.repository,
+    branch: flags.git.branch,
+    command: Flag.optional(
+      Flag.string("command").pipe(Flag.withAlias("cmd"), Flag.withDescription("Bash command")),
+    ),
+  },
+  (input) =>
+    Effect.gen(function* () {
+      const service = yield* RunService;
+
+      return yield* service.run(input);
+    }).pipe(
+      Effect.catchIf(
+        (error): error is Picker.PickerCancelled | Picker.PickerNoMatch =>
+          error instanceof Picker.PickerCancelled || error instanceof Picker.PickerNoMatch,
+        () => Effect.succeed(0),
+      ),
+    ),
+).pipe(Command.withDescription("Pick repo and branch, then run bash in that workspace"));
+
 export const sandboxCommand = Command.make("sandbox").pipe(
   Command.withAlias("s"),
   Command.withDescription("Manage sandboxes"),
-  Command.withSubcommands([addCommand, removeCommand, switchCommand]),
+  Command.withSubcommands([addCommand, removeCommand, switchCommand, runCommand]),
 );

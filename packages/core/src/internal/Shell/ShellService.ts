@@ -30,6 +30,17 @@ export interface ShellService {
     command: string[];
     errorMessage: string;
   }) => Effect.Effect<void, ShellError, never>;
+  run: ({
+    command,
+    cwd,
+    env,
+    errorMessage,
+  }: {
+    command: string;
+    cwd?: string;
+    env?: Record<string, string | undefined>;
+    errorMessage?: string;
+  }) => Effect.Effect<number, ShellError, never>;
 }
 
 export const ShellService = ServiceMap.Service<ShellService>("ShellService");

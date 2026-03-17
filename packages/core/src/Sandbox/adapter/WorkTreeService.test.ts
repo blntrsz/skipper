@@ -61,6 +61,7 @@ const shellService: ShellServiceShape = {
   bool: () => Effect.die("not used"),
   $: () => Effect.die("not used"),
   exec: () => Effect.die("not used"),
+  run: () => Effect.die("not used"),
 };
 
 const runRemove = (config: { repository: string; branch: string }, gitService: GitServiceShape) =>

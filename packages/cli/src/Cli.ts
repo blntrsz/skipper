@@ -7,7 +7,7 @@ import { command } from "./CommandTree";
 import { toTopLevelErrorMessage } from "./TopLevelError";
 
 const cli = Effect.gen(function* () {
-  yield* Command.run(command, {
+  return yield* Command.run(command, {
     version: packageJson.version,
   });
 }).pipe(Effect.withLogSpan("effect.cli"));
@@ -22,7 +22,12 @@ const main = runtime.servicesEffect.pipe(
             process.exitCode = 1;
             console.error(toTopLevelErrorMessage(error));
           }),
-    onSuccess: () => Effect.void,
+    onSuccess: (exitCode) =>
+      Effect.sync(() => {
+        if (typeof exitCode === "number") {
+          process.exitCode = exitCode;
+        }
+      }),
   }),
 );
 

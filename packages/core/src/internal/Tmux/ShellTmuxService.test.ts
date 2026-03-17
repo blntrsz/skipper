@@ -52,6 +52,7 @@ describe("ShellTmuxService", () => {
       bool: ({ command }) => Effect.succeed(command !== "command -v tmux >/dev/null 2>&1"),
       $: () => Effect.succeed(""),
       exec: () => Effect.void,
+      run: () => Effect.die("not used"),
     };
 
     await expect(runAttachSession(shell)).rejects.toMatchObject({
@@ -82,6 +83,7 @@ describe("ShellTmuxService", () => {
         calls.push({ type: "exec", command });
         return Effect.void;
       },
+      run: () => Effect.die("not used"),
     };
 
     await runAttachSession(shell);
@@ -121,6 +123,7 @@ describe("ShellTmuxService", () => {
         calls.push({ type: "exec", command });
         return Effect.void;
       },
+      run: () => Effect.die("not used"),
     };
 
     await runAttachSession(shell);
