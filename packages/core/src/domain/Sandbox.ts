@@ -1,5 +1,13 @@
 import { Schema } from "effect";
 
+export class SandboxError extends Schema.TaggedErrorClass<SandboxError>("skipper/SandboxError")(
+  "SandboxError",
+  {
+    message: Schema.String,
+    cause: Schema.optional(Schema.Defect),
+  },
+) {}
+
 export const TmuxWorkTreeSandboxConfig = Schema.Struct({
   type: Schema.Literal("tmux-worktree"),
 });

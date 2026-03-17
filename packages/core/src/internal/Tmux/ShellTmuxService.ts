@@ -9,15 +9,14 @@ export const ShellTmuxService = ServiceMap.make(TmuxService, {
         const isInTmuxSession = !!process.env.TMUX;
         const { $, bool, exec } = yield* Shell.ShellService;
 
-        const pgrep = yield* $({
-          command: "pgrep tmux",
-          errorMessage: "Failed to check tmux status",
+        const hasTmuxInstalled = yield* bool({
+          command: "command -v tmux >/dev/null 2>&1",
+          errorMessage: "Failed to check tmux installation",
         });
-        const isTmuxRunning = !!pgrep;
 
-        if (!isTmuxRunning) {
+        if (!hasTmuxInstalled) {
           return yield* new Shell.ShellError({
-            message: "Tmux is not running. Please start tmux and try again.",
+            message: "tmux is required for sandbox switch. Install tmux and retry.",
           });
         }
 
@@ -34,14 +33,21 @@ export const ShellTmuxService = ServiceMap.make(TmuxService, {
           });
         }
 
-        if (isInTmuxSession) {
+        const canSwitchClient =
+          isInTmuxSession &&
+          (yield* bool({
+            command: "tmux display-message -p '#S' >/dev/null 2>&1",
+            errorMessage: "Failed to verify tmux client context",
+          }));
+
+        if (canSwitchClient) {
           const cmd = ["tmux", "switch-client", "-t", sessionName];
           yield* exec({
             command: cmd,
             errorMessage: `Failed to switch tmux session '${sessionName}'`,
           });
         } else {
-          const cmd = ["tmux", "attach-session", "-t", sessionName];
+          const cmd = ["env", "-u", "TMUX", "tmux", "attach-session", "-t", sessionName];
           yield* exec({
             command: cmd,
             errorMessage: `Failed to attach to tmux session '${sessionName}'`,

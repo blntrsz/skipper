@@ -1,6 +1,5 @@
-import { Path, Picker, SandboxService, SwitchService } from "@skippercorp/core";
+import { Path, Picker, Sandbox, SandboxService, SwitchService } from "@skippercorp/core";
 import { Effect, FileSystem } from "effect";
-import { systemError } from "effect/PlatformError";
 import { Argument, Command, Flag } from "effect/unstable/cli";
 
 const flags = {
@@ -17,6 +16,24 @@ const flags = {
   },
 };
 
+const ensureCommandInstalled = (command: string, installMessage: string) =>
+  Effect.tryPromise({
+    try: async () => {
+      const result = await Bun.$`${{ raw: `command -v ${command} >/dev/null 2>&1` }}`
+        .env(process.env)
+        .nothrow();
+
+      if (result.exitCode !== 0) {
+        throw new Error(installMessage);
+      }
+    },
+    catch: (cause) =>
+      new Sandbox.SandboxError({
+        message: installMessage,
+        cause,
+      }),
+  });
+
 export const cloneCommand = Command.make(
   "clone",
   {
@@ -29,6 +46,10 @@ export const cloneCommand = Command.make(
       const fs = yield* FileSystem.FileSystem;
 
       yield* fs.makeDirectory(Path.repositoryRoot(), { recursive: true });
+      yield* ensureCommandInstalled(
+        "gh",
+        "gh is required for clone. Install GitHub CLI and retry.",
+      );
 
       yield* Effect.tryPromise({
         try: async () => {
@@ -42,12 +63,8 @@ export const cloneCommand = Command.make(
           }
         },
         catch: (cause) =>
-          systemError({
-            _tag: "Unknown",
-            module: "SandboxCli",
-            method: "cloneCommand",
-            description: `Failed to clone repository '${input.repository}'`,
-            pathOrDescriptor: Path.repositoryRoot(),
+          new Sandbox.SandboxError({
+            message: `Failed to clone repository '${input.repository}'`,
             cause,
           }),
       });
