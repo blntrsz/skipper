@@ -1,5 +1,13 @@
 # @skippercorp/skipper-cli
 
+## 0.0.3
+
+### Patch Changes
+
+- 172192f: Make `sandbox rm` pick missing repo or branch values, remove legacy worktree folders, and print only the user-facing error message from skipper.
+- 994c9f2: Make sandbox clone and switch fail more predictably by surfacing friendly dependency errors and recovering when tmux is not already running.
+- 2df1ebb: Add `sandbox run` so skipper can pick a repo and branch, prompt for a bash command, run it in the selected workspace, and return the child exit code.
+
 ## 0.0.2
 
 ### Patch Changes
