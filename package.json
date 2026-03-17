@@ -7,7 +7,7 @@
   ],
   "type": "module",
   "scripts": {
-    "cli": "bun --filter '@skippercorp/skipper-cli' cli",
+    "cli": "bun run ./packages/cli/src/Cli.ts",
     "lint": "oxlint .",
     "format": "oxfmt --check .",
     "typecheck": "turbo run typecheck",

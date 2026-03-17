@@ -1,4 +1,5 @@
 export * from "./adapter/WorkTreeService";
+export * from "./GitTargetResolver";
 export * from "./SandboxService";
 export * from "./SwitchService";
 export * from "./TmuxSwitchService";

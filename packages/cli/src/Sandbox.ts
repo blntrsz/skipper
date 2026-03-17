@@ -34,6 +34,14 @@ const ensureCommandInstalled = (command: string, installMessage: string) =>
       }),
   });
 
+const catchPickerExit = <A, E, R>(
+  effect: Effect.Effect<A, E | Picker.PickerCancelled | Picker.PickerNoMatch, R>,
+) =>
+  effect.pipe(
+    Effect.catchTag("PickerCancelled", () => Effect.void),
+    Effect.catchTag("PickerNoMatch", () => Effect.void),
+  );
+
 export const cloneCommand = Command.make(
   "clone",
   {
@@ -86,14 +94,16 @@ export const addCommand = Command.make("add", flags, (config) =>
 ).pipe(Command.withDescription("Create sandbox resources"));
 
 export const removeCommand = Command.make("remove", flags, (config) =>
-  Effect.gen(function* () {
-    const service = yield* SandboxService;
+  catchPickerExit(
+    Effect.gen(function* () {
+      const service = yield* SandboxService;
 
-    yield* service.remove(
-      { type: "tmux-worktree" },
-      Path.GitRepositoryOption.makeUnsafe(config.git),
-    );
-  }),
+      yield* service.remove(
+        { type: "tmux-worktree" },
+        Path.GitRepositoryOption.makeUnsafe(config.git),
+      );
+    }),
+  ),
 ).pipe(Command.withAlias("rm"), Command.withDescription("Remove sandbox resources"));
 
 const switchCommand = Command.make(
@@ -104,16 +114,12 @@ const switchCommand = Command.make(
     create: Flag.boolean("create").pipe(Flag.withDescription("Create new branch and switch")),
   },
   (input) =>
-    Effect.gen(function* () {
-      const service = yield* SwitchService;
+    catchPickerExit(
+      Effect.gen(function* () {
+        const service = yield* SwitchService;
 
-      yield* service.run(input);
-    }).pipe(
-      Effect.catchIf(
-        (error): error is Picker.PickerCancelled | Picker.PickerNoMatch =>
-          error instanceof Picker.PickerCancelled || error instanceof Picker.PickerNoMatch,
-        () => Effect.void,
-      ),
+        yield* service.run(input);
+      }),
     ),
 ).pipe(Command.withAlias("sw"), Command.withDescription("Pick repo and branch, then switch tmux"));
 

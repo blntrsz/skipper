@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { Effect, FileSystem } from "effect";
 import * as Path from "../../domain/Path";
 import { GitRepository } from "../../domain/Path";
@@ -38,13 +39,32 @@ export const remove = (config: GitRepository) =>
     const fs = yield* FileSystem.FileSystem;
     const git = yield* Git.GitService;
     const repositoryPath = Path.makeRepositoryPath(config.repository);
+    const workTreeRepositoryPath = Path.makeWorkTreeRepositoryPath(config);
     const workTreePath = Path.makeWorkTreePath(config);
+    const legacyWorkTreePath = Path.WorkTreePath.makeUnsafe(
+      join(workTreeRepositoryPath, config.branch),
+    );
     const isWorkTreeExists = yield* fs.exists(workTreePath);
+    const isLegacyWorkTreeExists = yield* fs.exists(legacyWorkTreePath);
 
-    if (!isWorkTreeExists) {
+    if (!isWorkTreeExists && !isLegacyWorkTreeExists) {
       return;
     }
 
-    yield* git.removeWorkTree(repositoryPath, workTreePath);
-    yield* fs.remove(workTreePath, { recursive: true, force: true });
+    const actualWorkTreePath = isWorkTreeExists ? workTreePath : legacyWorkTreePath;
+
+    yield* git.removeWorkTree(repositoryPath, actualWorkTreePath);
+    yield* fs.remove(actualWorkTreePath, { recursive: true, force: true });
+
+    const remainingEntries = yield* fs
+      .readDirectory(workTreeRepositoryPath)
+      .pipe(
+        Effect.catchTag("PlatformError", (error) =>
+          error.reason._tag === "NotFound" ? Effect.succeed([]) : Effect.fail(error),
+        ),
+      );
+
+    if (remainingEntries.length === 0) {
+      yield* fs.remove(workTreeRepositoryPath, { recursive: true, force: true });
+    }
   });

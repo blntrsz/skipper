@@ -1,5 +1,6 @@
 import { Effect, ServiceMap } from "effect";
 import { Git } from "../internal";
+import { resolveGitTarget } from "./GitTargetResolver";
 import * as WorkTreeSandbox from "./adapter/WorkTreeService";
 import { SandboxService } from "./SandboxService";
 
@@ -21,8 +22,9 @@ const create: SandboxService["create"] = (_config, git) =>
 
 const remove: SandboxService["remove"] = (config, git) =>
   Effect.gen(function* () {
-    const gitService = yield* Git.GitService;
-    const gitRepository = yield* gitService.resolveGitRepository(git);
+    const gitRepository = yield* resolveGitTarget(git, {
+      missingMessage: "sandbox rm requires a TTY when --repository or --branch is missing",
+    });
 
     yield* WorkTreeSandbox.remove(gitRepository);
     yield* Effect.logInfo(`Sandbox removed for ${gitRepository.repository} (${config.type})`);
