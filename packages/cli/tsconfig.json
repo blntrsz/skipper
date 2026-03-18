@@ -1,11 +1,17 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "baseUrl": ".",
     "paths": {
-      "@skippercorp/core": ["../core/src/index.ts"],
-      "@skippercorp/core/*": ["../core/src/*"]
+      "@skippercorp/core": [
+        "../core/src/index.ts"
+      ],
+      "@skippercorp/core/*": [
+        "../core/src/*"
+      ]
     }
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"]
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts"
+  ]
 }
