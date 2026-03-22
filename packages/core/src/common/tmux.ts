@@ -35,7 +35,7 @@ export namespace Tmux {
   export const hasSession = Effect.fn("tmux.hasSession")(function* (sessionName: string) {
     const process = yield* ChildProcess.make`tmux has-session -t ${sessionName}`;
 
-    return (yield* process.exitCode) === 1;
+    return (yield* process.exitCode) === 0;
   });
 
   /**

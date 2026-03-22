@@ -1,7 +1,6 @@
 import * as SessionUseCase from "@skippercorp/core/session/use-case";
-import { Effect } from "effect";
+import { Effect, Console } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
-import { printJson } from "./session.common";
 
 export const createSessionCommand = Command.make(
   "create",
@@ -18,6 +17,6 @@ export const createSessionCommand = Command.make(
         title: input.title,
       });
 
-      yield* printJson(session);
+      yield* Console.table(session);
     }),
 ).pipe(Command.withDescription("Create session"));

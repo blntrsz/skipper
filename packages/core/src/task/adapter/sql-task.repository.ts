@@ -1,12 +1,12 @@
 import { Effect, Layer, Schema } from "effect";
 import { SqlClient, SqlModel, SqlSchema } from "effect/unstable/sql";
-import { Task } from "../domain/task.model";
+import { TaskModel } from "../domain/task.model";
 import { TaskRepository } from "../port/task.repository";
 
 export const SqlTaskRepositoryLayer = Layer.effect(
   TaskRepository,
   Effect.gen(function* () {
-    const BaseTaskRepository = SqlModel.makeRepository(Task, {
+    const BaseTaskRepository = SqlModel.makeRepository(TaskModel, {
       idColumn: "id",
       tableName: "tasks",
       spanPrefix: "TaskRepository",
@@ -18,13 +18,13 @@ export const SqlTaskRepositoryLayer = Layer.effect(
 
     const findAll = SqlSchema.findAll({
       Request: Schema.Void,
-      Result: Task,
+      Result: TaskModel,
       execute: () => sql`SELECT * FROM tasks`,
     });
 
     const findByRepository = SqlSchema.findAll({
       Request: Schema.Struct({ repository: Schema.String }),
-      Result: Task,
+      Result: TaskModel,
       execute: ({ repository }) => sql`SELECT * FROM tasks WHERE repository = ${repository}`,
     });
 

@@ -1,7 +1,7 @@
 import * as SessionUseCase from "@skippercorp/core/session/use-case";
-import { Effect } from "effect";
+import { Effect, Console } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
-import { idFlag, printJson, sessionStateChoices } from "./session.common";
+import { idFlag, sessionStateChoices } from "./session.common";
 
 export const updateSessionStateCommand = Command.make(
   "update-state",
@@ -13,6 +13,6 @@ export const updateSessionStateCommand = Command.make(
     Effect.gen(function* () {
       const session = yield* SessionUseCase.updateSessionState(input.id, input.state);
 
-      yield* printJson(session);
+      yield* Console.table(session);
     }),
 ).pipe(Command.withDescription("Update session state"));

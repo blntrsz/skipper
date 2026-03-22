@@ -13,7 +13,7 @@ export const TaskState = Schema.Union([
 ]);
 export type TaskState = typeof TaskState.Type;
 
-export class Task extends Model.Class<Task>("Task")({
+export class TaskModel extends Model.Class<TaskModel>("Task")({
   id: Model.GeneratedByApp(TaskId),
   description: Schema.String,
   repository: Schema.String,
@@ -33,7 +33,7 @@ export type TaskCreate = typeof TaskCreate.Type;
 export const make = Effect.fn("task.make")(function* (input: TaskCreate) {
   const now = yield* DateTime.now;
 
-  return Task.makeUnsafe({
+  return TaskModel.makeUnsafe({
     id: TaskId.makeUnsafe(ulid()),
     description: input.description,
     repository: input.repository,

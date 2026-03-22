@@ -1,12 +1,7 @@
 import * as SessionUseCase from "@skippercorp/core/session/use-case";
-import { Effect, Option } from "effect";
+import { Effect, Option, Console } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
-import {
-  idFlag,
-  printJson,
-  sessionStateChoices,
-  sessionMessageRoleChoices,
-} from "./session.common";
+import { idFlag, sessionStateChoices, sessionMessageRoleChoices } from "./session.common";
 
 export const addSessionMessageCommand = Command.make(
   "add-message",
@@ -27,6 +22,6 @@ export const addSessionMessageCommand = Command.make(
         Option.getOrUndefined(input.state),
       );
 
-      yield* printJson(message);
+      yield* Console.table(message);
     }),
 ).pipe(Command.withDescription("Add session message"));

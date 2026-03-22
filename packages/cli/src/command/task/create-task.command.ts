@@ -1,7 +1,7 @@
 import * as Task from "@skippercorp/core/task/use-case";
-import { Effect } from "effect";
+import { Effect, Console } from "effect";
 import { Command } from "effect/unstable/cli";
-import { flags, printJson } from "./task.common";
+import { flags } from "./task.common";
 
 export const createTaskCommand = Command.make(
   "create",
@@ -12,12 +12,8 @@ export const createTaskCommand = Command.make(
   },
   (input) =>
     Effect.gen(function* () {
-      const task = yield* Task.createTask({
-        description: input.description,
-        repository: input.repository,
-        branch: input.branch,
-      });
+      const task = yield* Task.createTask(input);
 
-      yield* printJson(task);
+      yield* Console.table(task);
     }),
-).pipe(Command.withDescription("Create task"));
+).pipe(Command.withAlias("c"), Command.withDescription("Create task"));
