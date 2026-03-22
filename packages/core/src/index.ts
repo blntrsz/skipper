@@ -1,5 +1,3 @@
-export * from "./domain";
-export * from "./internal";
-export * from "./Sandbox";
-export * from "./Session";
-export * from "./Task";
+export * as Task from "./task";
+export * as Workspace from "./workspace";
+export * as Session from "./session";

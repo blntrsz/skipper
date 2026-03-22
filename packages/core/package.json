@@ -6,7 +6,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./*": "./src/*.ts"
+    "./common/sql": "./src/common/sql.ts",
+    "./*": "./src/*/index.ts"
   },
   "scripts": {
     "typecheck": "bun x tsc --noEmit -p tsconfig.json",
