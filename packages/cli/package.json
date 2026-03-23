@@ -16,11 +16,11 @@
     "access": "public"
   },
   "scripts": {
-    "cli": "bun run ./src/Cli.ts",
+    "cli": "bun run ./src/index.ts",
     "typecheck": "bun x tsc --noEmit -p tsconfig.json",
     "test": "bun x --bun vitest run",
     "deps:check": "bun x tsc --noEmit -p tsconfig.json",
-    "build": "bun build ./src/Cli.ts --target bun-darwin-arm64 --compile --outfile bin/skipper"
+    "build": "bun build ./src/index.ts --target bun-darwin-arm64 --compile --outfile bin/skipper"
   },
   "dependencies": {
     "@effect/platform-bun": "4.0.0-beta.30",
