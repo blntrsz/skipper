@@ -1,9 +1,9 @@
 import { Workspace } from "@skippercorp/core";
 import { Effect } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
-import { flags, pickProject } from "./sandbox.common";
+import { flags, pickProject } from "./workspace.common";
 
-export const attachSandboxCommand = Command.make(
+export const attachWorkspaceCommand = Command.make(
   "attach",
   {
     ...flags,
@@ -21,4 +21,4 @@ export const attachSandboxCommand = Command.make(
 
       yield* Workspace.attachWorkspace(project);
     }),
-).pipe(Command.withAlias("a"), Command.withDescription("Attach to a sandbox workspace"));
+).pipe(Command.withAlias("a"), Command.withDescription("Attach to a workspace"));

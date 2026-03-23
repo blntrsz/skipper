@@ -44,14 +44,14 @@ bunx @skippercorp/skipper-cli --help
 # Clone into ~/.local/share/github/<repo>
 sk clone owner/repo
 
-# Create a worktree for a feature branch
-sk sandbox add --repository repo --branch feature/my-change
+# Create a workspace for a feature branch
+sk workspace create --repository repo --branch feature/my-change
 
 # Jump into a tmux session for that workspace
-sk sandbox switch --repository repo --branch feature/my-change
+sk workspace attach --repository repo --branch feature/my-change
 
 # Run a shell command in that same workspace
-sk sandbox run --repository repo --branch feature/my-change --command "bun test"
+sk workspace run --repository repo --branch feature/my-change --command "bun test"
 ```
 
 `main` is treated specially: it uses the repository checkout directly, while other branches use dedicated worktrees.

@@ -1,9 +1,9 @@
 import { Workspace } from "@skippercorp/core";
 import { Effect, Option } from "effect";
 import { Command, Flag, Prompt } from "effect/unstable/cli";
-import { flags, pickProject } from "./sandbox.common";
+import { flags, pickProject } from "./workspace.common";
 
-export const runSandboxCommand = Command.make(
+export const runWorkspaceCommand = Command.make(
   "run",
   {
     ...flags,
@@ -31,4 +31,4 @@ export const runSandboxCommand = Command.make(
 
       yield* Workspace.runCommandInWorkspace(project, command);
     }),
-).pipe(Command.withAlias("r"), Command.withDescription("Run a command in a sandbox workspace"));
+).pipe(Command.withAlias("r"), Command.withDescription("Run a command in a workspace"));
