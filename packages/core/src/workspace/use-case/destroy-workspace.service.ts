@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Console, Effect } from "effect";
 import { SandboxService } from "../port/sandbox.service";
 import { FileSystemService } from "../port/file-system.service";
 import { ProjectService } from "../port/project.service";
@@ -24,7 +24,15 @@ export const destroyWorkspace = Effect.fn("workspace.destroy")(function* (
     const mainProjectPath = yield* fileSystem.mainProjectCwd(projectModel);
     const branchPath = yield* fileSystem.branchProjectCwd(projectModel);
     const command = yield* project.removeBranch(branchPath);
-    yield* sandbox.execute(command.pipe(ChildProcess.setCwd(mainProjectPath)));
+    yield* sandbox.execute(command.pipe(ChildProcess.setCwd(mainProjectPath))).pipe(
+      Effect.catchTag("SandboxError", (e) => {
+        if (e.message.includes(branchPath) && e.message.includes("not a working tree")) {
+          return Console.log(`Worktree '${branchPath}' already deleted`);
+        }
+
+        return Effect.fail(e);
+      }),
+    );
 
     yield* fileSystem.destroy(projectModel);
   }

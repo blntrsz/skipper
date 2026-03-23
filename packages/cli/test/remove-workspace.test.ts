@@ -4,6 +4,7 @@ import {
   FileSystemService,
   ProjectModel,
   ProjectService,
+  SandboxError,
   SandboxService,
 } from "@skippercorp/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
@@ -137,6 +138,83 @@ describe("workspace remove", () => {
       expect(calls.destroyed).toEqual([]);
       expect(calls.executed).toBe(0);
       expect(calls.detached).toBe(1);
+      expect(calls.sandboxDestroyed).toBe(1);
+    }),
+  );
+
+  it.effect("ignores stale git worktree metadata and still removes folder", () =>
+    Effect.gen(function* () {
+      const project = new ProjectModel({
+        name: "skipper",
+        branch: "switch-command",
+      });
+      const mainProjectPath = "/repos/skipper";
+      const branchPath = "/worktrees/skipper/skipper.switch-command";
+      const removeCommand = ChildProcess.make`git worktree remove ${branchPath}`;
+
+      const calls = {
+        branchPath: [] as Array<string>,
+        detached: [] as Array<ProjectModel>,
+        destroyed: [] as Array<ProjectModel>,
+        executed: 0,
+        sandboxDestroyed: 0,
+      };
+
+      yield* destroyWorkspace(project).pipe(
+        Effect.provideService(
+          ChildProcessSpawner.ChildProcessSpawner,
+          ChildProcessSpawner.make(() => Effect.die("unused")),
+        ),
+        Effect.provideService(
+          SandboxService,
+          SandboxService.of({
+            init: () => Effect.void,
+            destroy: () => Effect.sync(() => void calls.sandboxDestroyed++),
+            execute: () =>
+              Effect.gen(function* () {
+                calls.executed++;
+
+                return yield* Effect.fail(
+                  new SandboxError({
+                    message: `Command failed with exit code 128: fatal: '${branchPath}' is not a working tree\n`,
+                  }),
+                );
+              }),
+            attach: () => Effect.void,
+            detach: (project) => Effect.sync(() => void calls.detached.push(project)),
+          }),
+        ),
+        Effect.provideService(
+          FileSystemService,
+          FileSystemService.of({
+            fs: () => Effect.die("unused"),
+            init: () => Effect.void,
+            destroy: (project) => Effect.sync(() => void calls.destroyed.push(project)),
+            rootCwd: () => Effect.die("unused"),
+            mainCwd: () => Effect.die("unused"),
+            mainProjectCwd: () => Effect.succeed(mainProjectPath),
+            branchCwd: () => Effect.die("unused"),
+            branchProjectCwd: () => Effect.succeed(branchPath),
+          }),
+        ),
+        Effect.provideService(
+          ProjectService,
+          ProjectService.of({
+            clone: () => Effect.die("unused"),
+            branch: () => Effect.die("unused"),
+            removeBranch: (path) =>
+              Effect.sync(() => {
+                calls.branchPath.push(path);
+                return removeCommand;
+              }),
+          }),
+        ),
+      );
+
+      expect(calls.branchPath).toEqual([branchPath]);
+      expect(calls.detached).toEqual([project]);
+      expect(calls.destroyed).toEqual([project]);
+      expect(calls.executed).toBe(1);
       expect(calls.sandboxDestroyed).toBe(1);
     }),
   );
