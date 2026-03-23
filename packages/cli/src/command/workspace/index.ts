@@ -6,7 +6,6 @@ import { runWorkspaceCommand } from "./run-workspace.command";
 
 export const workspaceCommand = Command.make("workspace").pipe(
   Command.withAlias("w"),
-  Command.withAlias("s"),
   Command.withDescription("Manage workspaces"),
   Command.withSubcommands([
     attachWorkspaceCommand,

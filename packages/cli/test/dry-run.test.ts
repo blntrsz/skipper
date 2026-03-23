@@ -5,10 +5,19 @@ import { ConfigProvider, Effect } from "effect";
 import { TestConsole } from "effect/testing";
 import { Command } from "effect/unstable/cli";
 import { rootCommand } from "../src/command.ts";
+import { extractPickedBranch } from "../src/command/workspace/workspace.common";
 
 const EmptyConfigProvider = ConfigProvider.fromUnknown({});
 
 describe("cli dry-run", () => {
+  it("extracts picked branch from worktree folder name", () => {
+    expect(extractPickedBranch("skipper", "skipper.testingnewbranching")).toBe(
+      "testingnewbranching",
+    );
+    expect(extractPickedBranch("acme/widgets", "acme/widgets.feat/test")).toBe("feat/test");
+    expect(extractPickedBranch("skipper", "testingnewbranching")).toBe("testingnewbranching");
+  });
+
   it.effect("snapshots workspace attach alias output", () =>
     Effect.gen(function* () {
       const run = Command.runWith(rootCommand, { version: "test" });

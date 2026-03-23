@@ -1,4 +1,4 @@
-import { Effect, Layer, Stream } from "effect";
+import { Console, Effect, Layer, Stream } from "effect";
 import { SandboxError, SandboxService } from "../port/sandbox.service";
 import type { Command } from "effect/unstable/process/ChildProcess";
 import { Tmux } from "../../common/tmux";
@@ -58,13 +58,17 @@ export const WorkTreeSandboxServiceLayer = Layer.effect(
       const sessionName = Tmux.sessionName(project);
 
       yield* Tmux.killSession(sessionName).pipe(
-        Effect.catchTag("TmuxError", (e) =>
-          Effect.fail(
+        Effect.catchTag("TmuxError", (e) => {
+          if ((e.stderr ?? "").includes("can't find session")) {
+            return Console.log(`Tmux session '${sessionName}' already deleted`);
+          }
+
+          return Effect.fail(
             new SandboxError({
               message: e.toReadable(),
             }),
-          ),
-        ),
+          );
+        }),
       );
     });
 

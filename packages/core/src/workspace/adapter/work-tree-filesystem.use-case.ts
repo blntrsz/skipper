@@ -64,7 +64,10 @@ export const WorkTreeFileSystemServiceLayer = Layer.effect(
       project: ProjectModel,
     ) {
       const path = yield* branchProjectCwd(project);
-      yield* fs.remove(path);
+
+      if (yield* fs.exists(path)) {
+        yield* fs.remove(path);
+      }
     });
 
     const branchProjectCwd = Effect.fn("WorkTreeFileSystemServiceLayer.branchProjectCwd")(

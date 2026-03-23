@@ -9,6 +9,7 @@ import { deleteSessionCommand } from "./delete-session.command";
 
 export const sessionCommand = Command.make("session").pipe(
   Command.withDescription("Manage sessions"),
+  Command.withAlias("s"),
   Command.withSubcommands([
     createSessionCommand,
     listSessionsCommand,

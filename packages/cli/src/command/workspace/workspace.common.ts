@@ -2,6 +2,11 @@ import { Workspace } from "@skippercorp/core";
 import { Effect, Option, pipe } from "effect";
 import { Flag, Prompt } from "effect/unstable/cli";
 
+export const extractPickedBranch = (repository: string, input: string) => {
+  const prefix = `${repository}.`;
+  return input.startsWith(prefix) ? input.slice(prefix.length) : input;
+};
+
 export const flags = {
   git: {
     repository: Flag.optional(
@@ -68,7 +73,10 @@ export const pickProject = Effect.fn(function* (
                   message: "Select a branch",
                   maxPerPage: 10,
                   emptyMessage: "No matches",
-                  choices: options.map((option) => ({ title: option, value: option })),
+                  choices: options.map((option) => {
+                    const branch = extractPickedBranch(name, option);
+                    return { title: branch, value: branch };
+                  }),
                 }),
               ),
             ),

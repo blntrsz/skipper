@@ -18,19 +18,16 @@ export const destroyWorkspace = Effect.fn("workspace.destroy")(function* (
   const fileSystem = yield* FileSystemService;
   const project = yield* ProjectService;
 
-  if (projectModel.isMain()) {
-    yield* sandbox.detach(projectModel);
+  yield* sandbox.detach(projectModel);
+
+  if (projectModel.hasBranch()) {
     const mainProjectPath = yield* fileSystem.mainProjectCwd(projectModel);
     const branchPath = yield* fileSystem.branchProjectCwd(projectModel);
     const command = yield* project.removeBranch(branchPath);
     yield* sandbox.execute(command.pipe(ChildProcess.setCwd(mainProjectPath)));
-  } else {
-    yield* sandbox.detach(projectModel);
-    const mainProjectPath = yield* fileSystem.mainProjectCwd(projectModel);
-    const command = yield* project.removeBranch(mainProjectPath);
-    yield* sandbox.execute(command);
+
+    yield* fileSystem.destroy(projectModel);
   }
 
-  yield* fileSystem.destroy(projectModel);
   yield* sandbox.destroy();
 });
