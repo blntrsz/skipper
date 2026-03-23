@@ -8,6 +8,7 @@
     ".": "./src/index.ts",
     "./common/sql": "./src/common/sql.ts",
     "./runtime/local-work-tree.runtime": "./src/runtime/local-work-tree.runtime.ts",
+    "./common/adapter/*": "./src/common/adapter/*.ts",
     "./*": "./src/*/index.ts"
   },
   "scripts": {
