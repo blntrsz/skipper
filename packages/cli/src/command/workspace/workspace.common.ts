@@ -2,10 +2,32 @@ import { Workspace } from "@skippercorp/core";
 import { Effect, Option, pipe } from "effect";
 import { Flag, Prompt } from "effect/unstable/cli";
 
+const MAIN_BRANCH_PICK = "__SKIPPER_MAIN__";
+
+type BranchChoice = {
+  title: string;
+  value: string;
+};
+
 export const extractPickedBranch = (repository: string, input: string) => {
   const prefix = `${repository}.`;
   return input.startsWith(prefix) ? input.slice(prefix.length) : input;
 };
+
+export const buildBranchChoices = (repository: string, options: ReadonlyArray<string>) => {
+  const choices = options.map((option) => {
+    const branch = extractPickedBranch(repository, option);
+    return {
+      title: branch === "main" ? "main (branch worktree)" : branch,
+      value: branch,
+    } satisfies BranchChoice;
+  });
+
+  return [{ title: "main", value: MAIN_BRANCH_PICK } satisfies BranchChoice, ...choices];
+};
+
+export const resolvePickedBranch = (branch: string) =>
+  branch === MAIN_BRANCH_PICK ? undefined : branch;
 
 export const flags = {
   git: {
@@ -68,19 +90,14 @@ export const pickProject = Effect.fn(function* (
         : pipe(
             Workspace.listBranchProject(name),
             Effect.andThen((options) =>
-              options.length === 0
-                ? Effect.succeed(undefined)
-                : Prompt.run(
-                    Prompt.autoComplete({
-                      message: "Select a branch",
-                      maxPerPage: 10,
-                      emptyMessage: "No matches",
-                      choices: options.map((option) => {
-                        const branch = extractPickedBranch(name, option);
-                        return { title: branch, value: branch };
-                      }),
-                    }),
-                  ),
+              Prompt.run(
+                Prompt.autoComplete({
+                  message: "Select a branch",
+                  maxPerPage: 10,
+                  emptyMessage: "No matches",
+                  choices: buildBranchChoices(name, options),
+                }),
+              ).pipe(Effect.map(resolvePickedBranch)),
             ),
           ),
   });
