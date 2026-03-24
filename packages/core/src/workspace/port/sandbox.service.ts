@@ -42,6 +42,8 @@ export class SandboxService extends ServiceMap.Service<
       input: SandboxDestroyInput,
     ) => Effect.Effect<void, SandboxError | PlatformError.PlatformError, Scope.Scope>;
     execute: (
+      options: ChildProcess.CommandOptions,
+    ) => (
       templates: TemplateStringsArray,
       ...expressions: readonly ChildProcess.TemplateExpression[]
     ) => Effect.Effect<void, SandboxError | PlatformError.PlatformError, Scope.Scope>;

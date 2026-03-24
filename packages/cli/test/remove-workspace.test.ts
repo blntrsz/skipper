@@ -42,7 +42,7 @@ describe("workspace remove", () => {
                 calls.destroyInputs.push(input);
                 calls.sandboxDestroyed++;
               }),
-            execute: () => Effect.die("unused"),
+            execute: () => () => Effect.die("unused"),
             attach: () => Effect.void,
             detach: (project) => Effect.sync(() => void calls.detached.push(project)),
           }),
@@ -100,7 +100,7 @@ describe("workspace remove", () => {
                 calls.destroyInputs.push(input);
                 calls.sandboxDestroyed++;
               }),
-            execute: () => Effect.die("unused"),
+            execute: () => () => Effect.die("unused"),
             attach: () => Effect.void,
             detach: () => Effect.sync(() => void calls.detached++),
           }),
@@ -157,7 +157,7 @@ describe("workspace remove", () => {
                 calls.destroyInputs.push(input);
                 calls.sandboxDestroyed++;
               }),
-            execute: () => Effect.die("unused"),
+            execute: () => () => Effect.die("unused"),
             attach: () => Effect.void,
             detach: (project) => Effect.sync(() => void calls.detached.push(project)),
           }),
@@ -216,7 +216,7 @@ describe("workspace remove", () => {
               Effect.sync(() => {
                 calls.destroyInputs.push(input);
               }),
-            execute: () => Effect.die("unused"),
+            execute: () => () => Effect.die("unused"),
             attach: () => Effect.void,
             detach: () => Effect.void,
           }),
