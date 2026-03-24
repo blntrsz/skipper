@@ -77,7 +77,7 @@ export const WorkTreeFileSystemServiceLayer = Layer.effect(
     );
 
     return {
-      fs: () => Effect.sync(() => fs),
+      fs: Effect.sync(() => fs),
       init,
       destroy,
       rootCwd,

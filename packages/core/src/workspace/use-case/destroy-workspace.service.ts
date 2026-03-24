@@ -1,9 +1,7 @@
-import { Console, Effect } from "effect";
+import { Effect } from "effect";
 import { SandboxService } from "../port/sandbox.service";
 import { FileSystemService } from "../port/file-system.service";
-import { ProjectService } from "../port/project.service";
 import type { ProjectModel } from "../domain/project.model";
-import { ChildProcess } from "effect/unstable/process";
 
 /**
  * Destroys the current workspace
@@ -13,29 +11,26 @@ import { ChildProcess } from "effect/unstable/process";
  */
 export const destroyWorkspace = Effect.fn("workspace.destroy")(function* (
   projectModel: ProjectModel,
+  force = false,
 ) {
   const sandbox = yield* SandboxService;
   const fileSystem = yield* FileSystemService;
-  const project = yield* ProjectService;
 
   yield* sandbox.detach(projectModel);
 
   if (projectModel.hasBranch()) {
     const mainProjectPath = yield* fileSystem.mainProjectCwd(projectModel);
     const branchPath = yield* fileSystem.branchProjectCwd(projectModel);
-    const command = yield* project.removeBranch(branchPath);
-    yield* sandbox.execute(command.pipe(ChildProcess.setCwd(mainProjectPath))).pipe(
-      Effect.catchTag("SandboxError", (e) => {
-        if (e.message.includes(branchPath) && e.message.includes("not a working tree")) {
-          return Console.log(`Worktree '${branchPath}' already deleted`);
-        }
-
-        return Effect.fail(e);
-      }),
-    );
+    yield* sandbox.destroy({
+      project: projectModel,
+      mainProjectPath,
+      branchPath,
+      ...(force ? { force: true } : {}),
+    });
 
     yield* fileSystem.destroy(projectModel);
+    return;
   }
 
-  yield* sandbox.destroy();
+  yield* sandbox.destroy({ project: projectModel });
 });

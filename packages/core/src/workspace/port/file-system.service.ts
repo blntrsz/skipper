@@ -12,7 +12,7 @@ export class FileSystemError extends Schema.TaggedErrorClass<FileSystemError>("F
 export class FileSystemService extends ServiceMap.Service<
   FileSystemService,
   {
-    fs: () => Effect.Effect<FileSystem.FileSystem, never, never>;
+    fs: Effect.Effect<FileSystem.FileSystem, never, never>;
     init: () => Effect.Effect<void, FileSystemError, never>;
     destroy: (
       project: ProjectModel,

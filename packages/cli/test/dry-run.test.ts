@@ -23,7 +23,7 @@ describe("cli dry-run", () => {
       const run = Command.runWith(rootCommand, { version: "test" });
 
       yield* run([
-        "s",
+        "w",
         "a",
         "--dry-run",
         "--repository",

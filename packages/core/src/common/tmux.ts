@@ -1,136 +1,199 @@
-import { Config, Effect, Option, Schema, Stream } from "effect";
+import {
+  Config,
+  Effect,
+  Layer,
+  Option,
+  PlatformError,
+  Schema,
+  Scope,
+  ServiceMap,
+  Stream,
+} from "effect";
 import { ChildProcess } from "effect/unstable/process";
 import type { ProjectModel } from "../workspace";
+import { ChildProcessSpawner } from "effect/unstable/process";
 
-export namespace Tmux {
-  export class TmuxError extends Schema.TaggedErrorClass<TmuxError>()("TmuxError", {
-    message: Schema.String,
-    stderr: Schema.optional(Schema.String),
-  }) {
-    toReadable() {
-      const hasStderr = Boolean(this.stderr);
-      const reason = hasStderr ? ` Reason: ${this.stderr ?? "Unknown error"}` : "";
-      return `[TmuxError]: ${this.message}.` + reason;
-    }
+export class TmuxError extends Schema.TaggedErrorClass<TmuxError>()("TmuxError", {
+  message: Schema.String,
+  stderr: Schema.optional(Schema.String),
+}) {
+  toReadable() {
+    const hasStderr = Boolean(this.stderr);
+    const reason = hasStderr ? ` Reason: ${this.stderr ?? "Unknown error"}` : "";
+    return `[TmuxError]: ${this.message}.` + reason;
   }
+}
 
-  /**
-   * Checks if tmux is installed by running `which tmux` command. If tmux is not found, it throws a TmuxError with a message indicating that tmux is required for sandbox switch.
-   */
-  export const ensureInstalled = Effect.fn("tmux.isInstalled")(function* () {
-    const process = yield* ChildProcess.make`which tmux`;
+export class TmuxService extends ServiceMap.Service<
+  TmuxService,
+  {
+    ensureInstalled: () => Effect.Effect<
+      undefined,
+      PlatformError.PlatformError | TmuxError,
+      Scope.Scope
+    >;
+    hasSession: (
+      sessionName: string,
+    ) => Effect.Effect<boolean, PlatformError.PlatformError | TmuxError, Scope.Scope>;
+    isInSession: () => Effect.Effect<boolean, PlatformError.PlatformError | TmuxError, Scope.Scope>;
+    createSession: (
+      sessionName: string,
+      path: string,
+    ) => Effect.Effect<void, PlatformError.PlatformError | TmuxError, Scope.Scope>;
+    switchClient: (
+      sessionName: string,
+    ) => Effect.Effect<void, PlatformError.PlatformError | TmuxError, Scope.Scope>;
+    attachSession: (
+      sessionName: string,
+    ) => Effect.Effect<void, PlatformError.PlatformError | TmuxError, Scope.Scope>;
+    sessionName: (project: ProjectModel) => string;
+    killSession: (
+      sessionName: string,
+    ) => Effect.Effect<void, PlatformError.PlatformError | TmuxError, Scope.Scope>;
+  }
+>()("@skippercorp/core/common/tmux/TmuxService") {}
 
-    const isMissing = (yield* process.exitCode) === 1;
+export const TmuxServiceImpl = Layer.effect(
+  TmuxService,
+  Effect.gen(function* () {
+    const { spawn } = yield* ChildProcessSpawner.ChildProcessSpawner;
+    /**
+     * Checks if tmux is installed by running `which tmux` command. If tmux is not found, it throws a TmuxError with a message indicating that tmux is required for sandbox switch.
+     */
+    const ensureInstalled = Effect.fn("tmux.isInstalled")(function* () {
+      const process = yield* spawn(ChildProcess.make`which tmux`);
 
-    if (isMissing) {
-      return yield* new TmuxError({
-        message: "tmux is required for sandbox switch. Install tmux and retry.",
-      });
-    }
-  });
+      const isMissing = (yield* process.exitCode) === 1;
 
-  /**
-   * Checks if a tmux session with the given name exists by running `tmux has-session -t <sessionName>` command.
-   */
-  export const hasSession = Effect.fn("tmux.hasSession")(function* (sessionName: string) {
-    const process = yield* ChildProcess.make`tmux has-session -t ${sessionName}`;
+      if (isMissing) {
+        return yield* new TmuxError({
+          message: "tmux is required for sandbox switch. Install tmux and retry.",
+        });
+      }
+    });
 
-    return (yield* process.exitCode) === 0;
-  });
+    /**
+     * Checks if a tmux session with the given name exists by running `tmux has-session -t <sessionName>` command.
+     */
+    const hasSession = Effect.fn("tmux.hasSession")(function* (sessionName: string) {
+      const process = yield* spawn(ChildProcess.make`tmux has-session -t ${sessionName}`);
 
-  /**
-   * Checks if the current process is running inside a tmux session by checking the TMUX environment variable.
-   */
-  export const isInSession = Effect.fn("tmux.isInSession")(function* () {
-    const tmux = yield* Config.option(Config.string("TMUX"))
-      .asEffect()
-      .pipe(
-        Effect.mapError(
-          (error) =>
-            new TmuxError({
-              message: error.message,
-            }),
-        ),
+      return (yield* process.exitCode) === 0;
+    });
+
+    /**
+     * Checks if the current process is running inside a tmux session by checking the TMUX environment variable.
+     */
+    const isInSession = Effect.fn("tmux.isInSession")(function* () {
+      const tmux = yield* Config.option(Config.string("TMUX"))
+        .asEffect()
+        .pipe(
+          Effect.mapError(
+            (error) =>
+              new TmuxError({
+                message: error.message,
+              }),
+          ),
+        );
+
+      return Option.isSome(tmux);
+    });
+
+    /**
+     * Creates a new tmux session with the given name and path by running `tmux new-session -d -s <sessionName> -c <path>` command.
+     */
+    const createSession = Effect.fn("tmux.createSession")(function* (
+      sessionName: string,
+      path: string,
+    ) {
+      const process = yield* spawn(
+        ChildProcess.make`tmux new-session -d -s ${sessionName} -c ${path}`,
       );
 
-    return Option.isSome(tmux);
-  });
+      const stderr = yield* process.stderr.pipe(Stream.decodeText, Stream.mkString);
+      const exitCode = yield* process.exitCode;
 
-  /**
-   * Creates a new tmux session with the given name and path by running `tmux new-session -d -s <sessionName> -c <path>` command.
-   */
-  export const createSession = Effect.fn("tmux.createSession")(function* (
-    sessionName: string,
-    path: string,
-  ) {
-    const process = yield* ChildProcess.make`tmux new-session -d -s ${sessionName} -c ${path}`;
+      if (exitCode !== 0) {
+        return yield* new TmuxError({
+          message: `Failed to create tmux session '${sessionName}' at path '${path}'`,
+          stderr: stderr,
+        });
+      }
+    });
 
-    const stderr = yield* process.stderr.pipe(Stream.decodeText, Stream.mkString);
-    const exitCode = yield* process.exitCode;
+    /**
+     * Switches to an existing tmux session with the given name by running `tmux switch-client -t <sessionName>` command.
+     */
+    const switchClient = Effect.fn("tmux.switchClient")(function* (sessionName: string) {
+      const process = yield* spawn(
+        ChildProcess.make({
+          shell: true,
+        })`tmux switch-client -t ${sessionName}`,
+      );
 
-    if (exitCode !== 0) {
-      return yield* new TmuxError({
-        message: `Failed to create tmux session '${sessionName}' at path '${path}'`,
-        stderr: stderr,
-      });
-    }
-  });
+      const stderr = yield* process.stderr.pipe(Stream.decodeText, Stream.mkString);
+      const exitCode = yield* process.exitCode;
 
-  /**
-   * Switches to an existing tmux session with the given name by running `tmux switch-client -t <sessionName>` command.
-   */
-  export const switchClient = Effect.fn("tmux.switchClient")(function* (sessionName: string) {
-    const process = yield* ChildProcess.make({
-      shell: true,
-    })`tmux switch-client -t ${sessionName}`;
+      if (exitCode !== 0) {
+        return yield* new TmuxError({
+          message: `Failed to switch to tmux session '${sessionName}'`,
+          stderr: stderr,
+        });
+      }
+    });
 
-    const stderr = yield* process.stderr.pipe(Stream.decodeText, Stream.mkString);
-    const exitCode = yield* process.exitCode;
+    /**
+     * Attaches to an existing tmux session with the given name by running `tmux attach-session -t <sessionName>` command.
+     */
+    const attachSession = Effect.fn("tmux.attachSession")(function* (sessionName: string) {
+      const process = yield* spawn(
+        ChildProcess.make({
+          shell: true,
+        })`tmux attach-session -t ${sessionName}`,
+      );
 
-    if (exitCode !== 0) {
-      return yield* new TmuxError({
-        message: `Failed to switch to tmux session '${sessionName}'`,
-        stderr: stderr,
-      });
-    }
-  });
+      const stderr = yield* process.stderr.pipe(Stream.decodeText, Stream.mkString);
+      const exitCode = yield* process.exitCode;
 
-  /**
-   * Attaches to an existing tmux session with the given name by running `tmux attach-session -t <sessionName>` command.
-   */
-  export const attachSession = Effect.fn("tmux.attachSession")(function* (sessionName: string) {
-    const process = yield* ChildProcess.make({
-      shell: true,
-    })`tmux attach-session -t ${sessionName}`;
+      if (exitCode !== 0) {
+        return yield* new TmuxError({
+          message: `Failed to attach to tmux session '${sessionName}'`,
+          stderr: stderr,
+        });
+      }
+    });
 
-    const stderr = yield* process.stderr.pipe(Stream.decodeText, Stream.mkString);
-    const exitCode = yield* process.exitCode;
+    const sessionName = (project: ProjectModel) => {
+      return `${project.name}-${project.branch ?? "main"}`;
+    };
 
-    if (exitCode !== 0) {
-      return yield* new TmuxError({
-        message: `Failed to attach to tmux session '${sessionName}'`,
-        stderr: stderr,
-      });
-    }
-  });
+    const killSession = Effect.fn("tmux.killSession")(function* (sessionName: string) {
+      const process = yield* spawn(
+        ChildProcess.make({
+          shell: true,
+        })`tmux kill-session -t ${sessionName}`,
+      );
 
-  export const sessionName = (project: ProjectModel) => {
-    return `${project.name}-${project.branch ?? "main"}`;
-  };
+      const stderr = yield* process.stderr.pipe(Stream.decodeText, Stream.mkString);
+      const exitCode = yield* process.exitCode;
 
-  export const killSession = Effect.fn("tmux.killSession")(function* (sessionName: string) {
-    const process = yield* ChildProcess.make({
-      shell: true,
-    })`tmux kill-session -t ${sessionName}`;
+      if (exitCode !== 0) {
+        return yield* new TmuxError({
+          message: `Failed to kill tmux session '${sessionName}'`,
+          stderr: stderr,
+        });
+      }
+    });
 
-    const stderr = yield* process.stderr.pipe(Stream.decodeText, Stream.mkString);
-    const exitCode = yield* process.exitCode;
-
-    if (exitCode !== 0) {
-      return yield* new TmuxError({
-        message: `Failed to kill tmux session '${sessionName}'`,
-        stderr: stderr,
-      });
-    }
-  });
-}
+    return {
+      ensureInstalled,
+      hasSession,
+      isInSession,
+      createSession,
+      switchClient,
+      attachSession,
+      sessionName,
+      killSession,
+    };
+  }),
+);

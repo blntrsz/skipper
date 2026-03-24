@@ -5,7 +5,7 @@ export const listBranchProject = Effect.fn("workspace.project.list-brach")(funct
   repository: string,
 ) {
   const fileSystem = yield* FileSystemService;
-  const fs = yield* fileSystem.fs();
+  const fs = yield* fileSystem.fs;
 
   return yield* fs.readDirectory(yield* fileSystem.branchCwd(repository));
 });

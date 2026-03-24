@@ -1,53 +1,115 @@
 import { Console, Effect, Layer, Stream } from "effect";
 import { SandboxError, SandboxService } from "../port/sandbox.service";
-import type { Command } from "effect/unstable/process/ChildProcess";
-import { Tmux } from "../../common/tmux";
+import type { SandboxDestroyInput, SandboxInitInput } from "../port/sandbox.service";
+import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
+import { TmuxService } from "../../common/tmux";
 import type { ProjectModel } from "../domain";
 
 export const WorkTreeSandboxServiceLayer = Layer.effect(
   SandboxService,
   Effect.gen(function* () {
-    const execute = Effect.fn("WorkTreeSandboxService.execute")(function* (command: Command) {
-      const handle = yield* command;
+    const { spawn } = yield* ChildProcessSpawner.ChildProcessSpawner;
+    const tmux = yield* TmuxService;
 
-      yield* Stream.runForEach(handle.all, (chunk) =>
-        Effect.sync(() => {
-          globalThis.process.stdout.write(chunk);
-        }),
+    const execute = Effect.fn("WorkTreeSandboxService.execute")(function* (
+      templates: TemplateStringsArray,
+      ...expressions: readonly ChildProcess.TemplateExpression[]
+    ) {
+      const handle = yield* spawn(
+        ChildProcess.make({
+          stdin: "pipe",
+          stdout: "pipe",
+          stderr: "pipe",
+          shell: true,
+        })(templates, ...expressions),
       );
+
+      let result = "";
+      yield* Stream.runForEach(handle.all, (chunk) => {
+        const stringChunk = chunk.toString();
+        result += stringChunk;
+        return Console.log(stringChunk);
+      });
 
       const exitCode = yield* handle.exitCode;
 
       if (exitCode !== 0) {
-        const stderr = yield* handle.stderr.pipe(Stream.decodeText, Stream.mkString);
         return yield* new SandboxError({
-          message: `Command failed with exit code ${exitCode}: ${stderr}`,
+          reason: "ExecutionFailed",
+          message: `Command failed with exit code ${exitCode}: ${result}`,
         });
       }
     });
 
-    const init = Effect.fn("WorkTreeSandboxService.init")(() => Effect.void);
+    const init = Effect.fn("WorkTreeSandboxService.init")(function* (input: SandboxInitInput) {
+      const { project, mainProjectPath, mainExists, branchPath } = input;
 
-    const destroy = Effect.fn("WorkTreeSandboxService.destroy")(() => Effect.void);
+      if (!mainExists) {
+        const gitLink = `git@github.com:${project.namespace}/${project.name}.git`;
+        yield* execute`git clone ${gitLink} ${mainProjectPath}`;
+      }
+
+      if (project.hasBranch() && branchPath !== undefined) {
+        yield* execute`git worktree add ${branchPath} -b ${project.branch}`;
+      }
+    });
+
+    const destroy = Effect.fn("WorkTreeSandboxService.destroy")(function* (
+      input: SandboxDestroyInput,
+    ) {
+      const { branchPath, force = false, mainProjectPath } = input;
+
+      if (branchPath === undefined || mainProjectPath === undefined) {
+        return;
+      }
+
+      yield* (
+        force
+          ? execute`git worktree remove --force ${branchPath}`
+          : execute`git worktree remove ${branchPath}`
+      ).pipe(
+        Effect.catchTag("SandboxError", (e) => {
+          if (e.message.includes(branchPath) && e.message.includes("not a working tree")) {
+            return Console.log(`Worktree '${branchPath}' already deleted`);
+          }
+
+          if (
+            e.message.includes(branchPath) &&
+            e.message.includes("contains modified or untracked files, use --force to delete it")
+          ) {
+            return Effect.fail(
+              new SandboxError({
+                reason: "UncommittedChanges",
+                message:
+                  "Worktree contains uncommitted changes. Please commit or stash them before destroying the sandbox.",
+              }),
+            );
+          }
+
+          return Effect.fail(e);
+        }),
+      );
+    });
 
     const attach = Effect.fn("WorkTreeSandboxService.attach")(
       function* (project: ProjectModel, path: string) {
-        yield* Tmux.ensureInstalled();
+        yield* tmux.ensureInstalled();
 
-        const sessionName = Tmux.sessionName(project);
+        const sessionName = tmux.sessionName(project);
 
-        const isInTmuxSession = yield* Tmux.isInSession();
-        const hasTmuxSession = yield* Tmux.hasSession(sessionName);
+        const isInTmuxSession = yield* tmux.isInSession();
+        const hasTmuxSession = yield* tmux.hasSession(sessionName);
 
         if (!hasTmuxSession) {
-          yield* Tmux.createSession(sessionName, path);
+          yield* tmux.createSession(sessionName, path);
         }
 
-        yield* isInTmuxSession ? Tmux.switchClient(sessionName) : Tmux.attachSession(sessionName);
+        yield* isInTmuxSession ? tmux.switchClient(sessionName) : tmux.attachSession(sessionName);
       },
       Effect.catchTag("TmuxError", (e) =>
         Effect.fail(
           new SandboxError({
+            reason: "AttachFailed",
             message: e.toReadable(),
           }),
         ),
@@ -55,9 +117,9 @@ export const WorkTreeSandboxServiceLayer = Layer.effect(
     );
 
     const detach = Effect.fn("WorkTreeSandboxService.detach")(function* (project: ProjectModel) {
-      const sessionName = Tmux.sessionName(project);
+      const sessionName = tmux.sessionName(project);
 
-      yield* Tmux.killSession(sessionName).pipe(
+      yield* tmux.killSession(sessionName).pipe(
         Effect.catchTag("TmuxError", (e) => {
           if ((e.stderr ?? "").includes("can't find session")) {
             return Console.log(`Tmux session '${sessionName}' already deleted`);
@@ -65,6 +127,7 @@ export const WorkTreeSandboxServiceLayer = Layer.effect(
 
           return Effect.fail(
             new SandboxError({
+              reason: "DetachFailed",
               message: e.toReadable(),
             }),
           );

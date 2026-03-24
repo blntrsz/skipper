@@ -3,13 +3,13 @@ import {
   destroyWorkspace,
   FileSystemService,
   ProjectModel,
-  ProjectService,
-  SandboxError,
+  type SandboxDestroyInput,
+  type SandboxInitInput,
   SandboxService,
 } from "@skippercorp/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
-import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
+import { ChildProcessSpawner } from "effect/unstable/process";
 
 describe("workspace remove", () => {
   it.effect("removes selected branch worktree, not main repo", () =>
@@ -20,13 +20,11 @@ describe("workspace remove", () => {
       });
       const mainProjectPath = "/repos/skipper";
       const branchPath = "/worktrees/skipper/skipper.testcreateandremove";
-      const removeCommand = ChildProcess.make`git worktree remove ${branchPath}`;
 
       const calls = {
-        branchPath: [] as Array<string>,
+        destroyInputs: [] as Array<SandboxDestroyInput>,
         detached: [] as Array<ProjectModel>,
         destroyed: [] as Array<ProjectModel>,
-        executed: 0,
         sandboxDestroyed: 0,
       };
 
@@ -38,9 +36,13 @@ describe("workspace remove", () => {
         Effect.provideService(
           SandboxService,
           SandboxService.of({
-            init: () => Effect.void,
-            destroy: () => Effect.sync(() => void calls.sandboxDestroyed++),
-            execute: () => Effect.sync(() => void calls.executed++),
+            init: (_input: SandboxInitInput) => Effect.void,
+            destroy: (input) =>
+              Effect.sync(() => {
+                calls.destroyInputs.push(input);
+                calls.sandboxDestroyed++;
+              }),
+            execute: () => Effect.die("unused"),
             attach: () => Effect.void,
             detach: (project) => Effect.sync(() => void calls.detached.push(project)),
           }),
@@ -48,7 +50,7 @@ describe("workspace remove", () => {
         Effect.provideService(
           FileSystemService,
           FileSystemService.of({
-            fs: () => Effect.die("unused"),
+            fs: Effect.die("unused"),
             init: () => Effect.void,
             destroy: (project) => Effect.sync(() => void calls.destroyed.push(project)),
             rootCwd: () => Effect.die("unused"),
@@ -58,24 +60,17 @@ describe("workspace remove", () => {
             branchProjectCwd: () => Effect.succeed(branchPath),
           }),
         ),
-        Effect.provideService(
-          ProjectService,
-          ProjectService.of({
-            clone: () => Effect.die("unused"),
-            branch: () => Effect.die("unused"),
-            removeBranch: (path) =>
-              Effect.sync(() => {
-                calls.branchPath.push(path);
-                return removeCommand;
-              }),
-          }),
-        ),
       );
 
-      expect(calls.branchPath).toEqual([branchPath]);
+      expect(calls.destroyInputs).toEqual([
+        {
+          project,
+          mainProjectPath,
+          branchPath,
+        },
+      ]);
       expect(calls.detached).toEqual([project]);
       expect(calls.destroyed).toEqual([project]);
-      expect(calls.executed).toBe(1);
       expect(calls.sandboxDestroyed).toBe(1);
     }),
   );
@@ -85,9 +80,8 @@ describe("workspace remove", () => {
       const project = new ProjectModel({ name: "skipper" });
 
       const calls = {
-        branchPath: [] as Array<string>,
+        destroyInputs: [] as Array<SandboxDestroyInput>,
         destroyed: [] as Array<ProjectModel>,
-        executed: 0,
         detached: 0,
         sandboxDestroyed: 0,
       };
@@ -100,9 +94,13 @@ describe("workspace remove", () => {
         Effect.provideService(
           SandboxService,
           SandboxService.of({
-            init: () => Effect.void,
-            destroy: () => Effect.sync(() => void calls.sandboxDestroyed++),
-            execute: () => Effect.sync(() => void calls.executed++),
+            init: (_input: SandboxInitInput) => Effect.void,
+            destroy: (input) =>
+              Effect.sync(() => {
+                calls.destroyInputs.push(input);
+                calls.sandboxDestroyed++;
+              }),
+            execute: () => Effect.die("unused"),
             attach: () => Effect.void,
             detach: () => Effect.sync(() => void calls.detached++),
           }),
@@ -110,7 +108,7 @@ describe("workspace remove", () => {
         Effect.provideService(
           FileSystemService,
           FileSystemService.of({
-            fs: () => Effect.die("unused"),
+            fs: Effect.die("unused"),
             init: () => Effect.void,
             destroy: (project) => Effect.sync(() => void calls.destroyed.push(project)),
             rootCwd: () => Effect.die("unused"),
@@ -120,29 +118,16 @@ describe("workspace remove", () => {
             branchProjectCwd: () => Effect.die("unused"),
           }),
         ),
-        Effect.provideService(
-          ProjectService,
-          ProjectService.of({
-            clone: () => Effect.die("unused"),
-            branch: () => Effect.die("unused"),
-            removeBranch: (path) =>
-              Effect.sync(() => {
-                calls.branchPath.push(path);
-                return ChildProcess.make`git worktree remove ${path}`;
-              }),
-          }),
-        ),
       );
 
-      expect(calls.branchPath).toEqual([]);
+      expect(calls.destroyInputs).toEqual([{ project }]);
       expect(calls.destroyed).toEqual([]);
-      expect(calls.executed).toBe(0);
       expect(calls.detached).toBe(1);
       expect(calls.sandboxDestroyed).toBe(1);
     }),
   );
 
-  it.effect("ignores stale git worktree metadata and still removes folder", () =>
+  it.effect("still removes branch folder after sandbox worktree teardown", () =>
     Effect.gen(function* () {
       const project = new ProjectModel({
         name: "skipper",
@@ -150,13 +135,11 @@ describe("workspace remove", () => {
       });
       const mainProjectPath = "/repos/skipper";
       const branchPath = "/worktrees/skipper/skipper.switch-command";
-      const removeCommand = ChildProcess.make`git worktree remove ${branchPath}`;
 
       const calls = {
-        branchPath: [] as Array<string>,
+        destroyInputs: [] as Array<SandboxDestroyInput>,
         detached: [] as Array<ProjectModel>,
         destroyed: [] as Array<ProjectModel>,
-        executed: 0,
         sandboxDestroyed: 0,
       };
 
@@ -168,18 +151,13 @@ describe("workspace remove", () => {
         Effect.provideService(
           SandboxService,
           SandboxService.of({
-            init: () => Effect.void,
-            destroy: () => Effect.sync(() => void calls.sandboxDestroyed++),
-            execute: () =>
-              Effect.gen(function* () {
-                calls.executed++;
-
-                return yield* Effect.fail(
-                  new SandboxError({
-                    message: `Command failed with exit code 128: fatal: '${branchPath}' is not a working tree\n`,
-                  }),
-                );
+            init: (_input: SandboxInitInput) => Effect.void,
+            destroy: (input) =>
+              Effect.sync(() => {
+                calls.destroyInputs.push(input);
+                calls.sandboxDestroyed++;
               }),
+            execute: () => Effect.die("unused"),
             attach: () => Effect.void,
             detach: (project) => Effect.sync(() => void calls.detached.push(project)),
           }),
@@ -187,7 +165,7 @@ describe("workspace remove", () => {
         Effect.provideService(
           FileSystemService,
           FileSystemService.of({
-            fs: () => Effect.die("unused"),
+            fs: Effect.die("unused"),
             init: () => Effect.void,
             destroy: (project) => Effect.sync(() => void calls.destroyed.push(project)),
             rootCwd: () => Effect.die("unused"),
@@ -197,25 +175,75 @@ describe("workspace remove", () => {
             branchProjectCwd: () => Effect.succeed(branchPath),
           }),
         ),
+      );
+
+      expect(calls.destroyInputs).toEqual([
+        {
+          project,
+          mainProjectPath,
+          branchPath,
+        },
+      ]);
+      expect(calls.detached).toEqual([project]);
+      expect(calls.destroyed).toEqual([project]);
+      expect(calls.sandboxDestroyed).toBe(1);
+    }),
+  );
+
+  it.effect("passes force to sandbox destroy when requested", () =>
+    Effect.gen(function* () {
+      const project = new ProjectModel({
+        name: "skipper",
+        branch: "force-remove",
+      });
+      const mainProjectPath = "/repos/skipper";
+      const branchPath = "/worktrees/skipper/skipper.force-remove";
+
+      const calls = {
+        destroyInputs: [] as Array<SandboxDestroyInput>,
+      };
+
+      yield* destroyWorkspace(project, true).pipe(
         Effect.provideService(
-          ProjectService,
-          ProjectService.of({
-            clone: () => Effect.die("unused"),
-            branch: () => Effect.die("unused"),
-            removeBranch: (path) =>
+          ChildProcessSpawner.ChildProcessSpawner,
+          ChildProcessSpawner.make(() => Effect.die("unused")),
+        ),
+        Effect.provideService(
+          SandboxService,
+          SandboxService.of({
+            init: (_input: SandboxInitInput) => Effect.void,
+            destroy: (input) =>
               Effect.sync(() => {
-                calls.branchPath.push(path);
-                return removeCommand;
+                calls.destroyInputs.push(input);
               }),
+            execute: () => Effect.die("unused"),
+            attach: () => Effect.void,
+            detach: () => Effect.void,
+          }),
+        ),
+        Effect.provideService(
+          FileSystemService,
+          FileSystemService.of({
+            fs: Effect.die("unused"),
+            init: () => Effect.void,
+            destroy: () => Effect.void,
+            rootCwd: () => Effect.die("unused"),
+            mainCwd: () => Effect.die("unused"),
+            mainProjectCwd: () => Effect.succeed(mainProjectPath),
+            branchCwd: () => Effect.die("unused"),
+            branchProjectCwd: () => Effect.succeed(branchPath),
           }),
         ),
       );
 
-      expect(calls.branchPath).toEqual([branchPath]);
-      expect(calls.detached).toEqual([project]);
-      expect(calls.destroyed).toEqual([project]);
-      expect(calls.executed).toBe(1);
-      expect(calls.sandboxDestroyed).toBe(1);
+      expect(calls.destroyInputs).toEqual([
+        {
+          project,
+          mainProjectPath,
+          branchPath,
+          force: true,
+        },
+      ]);
     }),
   );
 });
