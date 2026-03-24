@@ -1,5 +1,19 @@
 # @skippercorp/skipper-cli
 
+## 0.1.0
+
+### Minor Changes
+
+- 82d0862: Add main branch option to workspace picker. Existing-workspace picker (attach/run/remove) now shows main as a selectable option; selecting main passes undefined branch to ProjectModel, targeting the main checkout at ~/.local/share/github/<repo>. Real branch worktrees named main are disambiguated as "main (branch worktree)".
+
+### Patch Changes
+
+- 289d6ae: Add shared root command wiring so global `--dry-run` and `--silent` flags work from every CLI entrypoint, including short aliases.
+- 7d1771c: Add clone command to handle workspace cloning from git branches with improved workspace cwd handling
+- 39aee17: Rename CLI sandbox commands to workspace commands so the public interface matches the underlying workspace model.
+- 8dab093: Fix the CLI build scripts to use the real entry file so release builds succeed on CI.
+- df2ad89: Make `w rm` treat stale worktree metadata as already removed so cleanup still succeeds.
+
 ## 0.0.4
 
 ### Patch Changes
