@@ -42,7 +42,7 @@ bunx @skippercorp/skipper-cli --help
 
 ```bash
 # Clone into ~/.local/share/github/<repo>
-sk clone owner/repo
+sk clone git@github.com:owner/repo.git
 
 # Create a workspace for a feature branch
 sk workspace create --repository repo --branch feature/my-change

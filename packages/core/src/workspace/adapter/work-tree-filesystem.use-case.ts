@@ -14,12 +14,34 @@ export const WorkTreeFileSystemServiceLayer = Layer.effect(
     const path = yield* Path.Path;
     const fs = yield* FileSystem.FileSystem;
 
+    const ensureDirectory = Effect.fn("WorkTreeFileSystemServiceLayer.ensureDirectory")(function* (
+      directory: string,
+    ) {
+      yield* Effect.gen(function* () {
+        if (!(yield* fs.exists(directory))) {
+          yield* fs.makeDirectory(directory, { recursive: true });
+        }
+      }).pipe(
+        Effect.catchTag("PlatformError", (e) =>
+          Effect.fail(
+            new FileSystemError({
+              message: e.message,
+            }),
+          ),
+        ),
+      );
+    });
+
     const rootCwd = Effect.fn("WorkTreeFileSystemServiceLayer.rootCwd")(function* () {
       return yield* Effect.sync(() => homedir());
     });
 
     const mainCwd = Effect.fn("WorkTreeFileSystemServiceLayer.mainCwd")(function* () {
-      return path.join(yield* rootCwd(), DEFAULT_REPOSITORY_ROOT);
+      const directory = path.join(yield* rootCwd(), DEFAULT_REPOSITORY_ROOT);
+
+      yield* ensureDirectory(directory);
+
+      return directory;
     });
 
     const mainProjectCwd = Effect.fn("WorkTreeFileSystemServiceLayer.mainProjectCwd")(
@@ -31,31 +53,19 @@ export const WorkTreeFileSystemServiceLayer = Layer.effect(
     const branchCwd = Effect.fn("WorkTreeFileSystemServiceLayer.branchCwd")(function* (
       repository: string,
     ) {
-      const root = yield* rootCwd();
-      return path.join(root, DEFAULT_WORK_TREE_ROOT, repository);
+      const directory = path.join(yield* rootCwd(), DEFAULT_WORK_TREE_ROOT, repository);
+
+      yield* ensureDirectory(directory);
+
+      return directory;
     });
 
     const init = Effect.fn("WorkTreeFileSystemServiceLayer.init")(function* () {
-      const root = homedir();
+      const root = yield* rootCwd();
 
       yield* Effect.forEach(
         [DEFAULT_DATA_ROOT, DEFAULT_WORK_TREE_ROOT, DEFAULT_REPOSITORY_ROOT],
-        (directory) =>
-          Effect.gen(function* () {
-            const absoluteDirectory = path.join(root, directory);
-
-            if (!(yield* fs.exists(absoluteDirectory))) {
-              yield* fs.makeDirectory(absoluteDirectory, { recursive: true });
-            }
-          }).pipe(
-            Effect.catchTag("PlatformError", (e) =>
-              Effect.fail(
-                new FileSystemError({
-                  message: e.message,
-                }),
-              ),
-            ),
-          ),
+        (directory) => ensureDirectory(path.join(root, directory)),
         { discard: true },
       );
     });

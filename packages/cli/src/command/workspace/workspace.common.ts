@@ -68,17 +68,19 @@ export const pickProject = Effect.fn(function* (
         : pipe(
             Workspace.listBranchProject(name),
             Effect.andThen((options) =>
-              Prompt.run(
-                Prompt.autoComplete({
-                  message: "Select a branch",
-                  maxPerPage: 10,
-                  emptyMessage: "No matches",
-                  choices: options.map((option) => {
-                    const branch = extractPickedBranch(name, option);
-                    return { title: branch, value: branch };
-                  }),
-                }),
-              ),
+              options.length === 0
+                ? Effect.succeed(undefined)
+                : Prompt.run(
+                    Prompt.autoComplete({
+                      message: "Select a branch",
+                      maxPerPage: 10,
+                      emptyMessage: "No matches",
+                      choices: options.map((option) => {
+                        const branch = extractPickedBranch(name, option);
+                        return { title: branch, value: branch };
+                      }),
+                    }),
+                  ),
             ),
           ),
   });
