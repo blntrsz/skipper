@@ -22,6 +22,7 @@ If you omit `--repository` or `--branch` in an interactive terminal, Skipper let
 - `bun`
 - `git`
 - `gh`
+- `opencode`
 - `tmux`
 
 ## Install
@@ -52,9 +53,14 @@ sk workspace attach --repository repo --branch feature/my-change
 
 # Run a shell command in that same workspace
 sk workspace run --repository repo --branch feature/my-change --command "bun test"
+
+# Run an OpenCode prompt in that workspace
+sk workspace prompt --repository repo --branch feature/my-change "Explain this codebase"
 ```
 
 `main` is treated specially: it uses the repository checkout directly, while other branches use dedicated worktrees.
+
+Before first `workspace prompt` use, configure OpenCode auth with `opencode auth login`.
 
 ## Development
 

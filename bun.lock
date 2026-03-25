@@ -19,7 +19,7 @@
     },
     "packages/cli": {
       "name": "@skippercorp/skipper-cli",
-      "version": "0.0.4",
+      "version": "0.1.0",
       "bin": {
         "sk": "./bin/skipper",
       },
@@ -48,6 +48,7 @@
         "@effect/vitest": "4.0.0-beta.30",
         "@octokit/webhooks": "^14.2.0",
         "@octokit/webhooks-types": "^7.6.1",
+        "@opencode-ai/sdk": "^1.3.0",
         "commander": "^14.0.3",
         "effect": "4.0.0-beta.30",
         "ulid": "^3.0.2",
@@ -302,6 +303,8 @@
     "@octokit/webhooks-methods": ["@octokit/webhooks-methods@6.0.0", "", {}, "sha512-MFlzzoDJVw/GcbfzVC1RLR36QqkTLUf79vLVO3D+xn7r0QgxnFoLZgtrzxiQErAjFUOdH6fas2KeQJ1yr/qaXQ=="],
 
     "@octokit/webhooks-types": ["@octokit/webhooks-types@7.6.1", "", {}, "sha512-S8u2cJzklBC0FgTwWVLaM8tMrDuDMVE4xiTK4EYXM9GntyvrdbSoxqDQa+Fh57CCNApyIpyeqPhhFEmHPfrXgw=="],
+
+    "@opencode-ai/sdk": ["@opencode-ai/sdk@1.3.2", "", {}, "sha512-u7sXVKn0kyAA5vVVHuHQfq3+3UGWOU1Sh6d/e+aS4zO8AwriTSWNQ9r8Qy5yxBH+PoeOGl5WIVdp+s2Ea2zuAg=="],
 
     "@oxfmt/binding-android-arm-eabi": ["@oxfmt/binding-android-arm-eabi@0.40.0", "", { "os": "android", "cpu": "arm" }, "sha512-S6zd5r1w/HmqR8t0CTnGjFTBLDq2QKORPwriCHxo4xFNuhmOTABGjPaNvCJJVnrKBLsohOeiDX3YqQfJPF+FXw=="],
 

@@ -22,6 +22,7 @@ export class Session extends Model.Class<Session>("Session")({
   repository: Schema.String,
   branch: Schema.String,
   title: Schema.String,
+  providerSessionId: Schema.optional(Schema.String),
   state: SessionState,
   createdAt: Model.GeneratedByApp(Schema.Number),
   updatedAt: Model.GeneratedByApp(Schema.Number),
@@ -32,6 +33,7 @@ export const SessionCreate = Schema.Struct({
   repository: Schema.String,
   branch: Schema.String,
   title: Schema.String,
+  providerSessionId: Schema.optional(Schema.String),
 });
 export type SessionCreate = typeof SessionCreate.Type;
 
@@ -44,6 +46,7 @@ export const make = Effect.fn("session.make")(function* (input: SessionCreate) {
     repository: input.repository,
     branch: input.branch,
     title: input.title,
+    providerSessionId: input.providerSessionId,
     state: "idle",
     createdAt: timestamp,
     updatedAt: timestamp,
