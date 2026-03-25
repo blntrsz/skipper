@@ -149,6 +149,9 @@ export const TmuxServiceImpl = Layer.effect(
       const process = yield* spawn(
         ChildProcess.make({
           shell: true,
+          stdin: "inherit",
+          stdout: "inherit",
+          stderr: "inherit",
         })`tmux attach-session -t ${sessionName}`,
       );
 
@@ -158,7 +161,7 @@ export const TmuxServiceImpl = Layer.effect(
       if (exitCode !== 0) {
         return yield* new TmuxError({
           message: `Failed to attach to tmux session '${sessionName}'`,
-          stderr: stderr,
+          stderr,
         });
       }
     });
