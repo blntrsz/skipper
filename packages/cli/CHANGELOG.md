@@ -1,5 +1,11 @@
 # @skippercorp/skipper-cli
 
+## 0.2.0
+
+### Minor Changes
+
+- 6223098: Add `workspace prompt` to run OpenCode in a selected workspace. Stream replies live and save the synced session transcript in local session history.
+
 ## 0.1.0
 
 ### Minor Changes
