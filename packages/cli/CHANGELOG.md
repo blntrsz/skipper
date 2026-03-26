@@ -1,5 +1,11 @@
 # @skippercorp/skipper-cli
 
+## 0.2.2
+
+### Patch Changes
+
+- f7137b4: fix: disable detached mode & stderr piping for tmux attach/switch. prevents early child exit by ensuring interactive tty binding stays active
+
 ## 0.2.1
 
 ### Patch Changes
