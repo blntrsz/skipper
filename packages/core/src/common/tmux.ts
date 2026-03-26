@@ -126,12 +126,12 @@ export const TmuxServiceImpl = Layer.effect(
      */
     const switchClient = Effect.fn("tmux.switchClient")(function* (sessionName: string) {
       const process = yield* spawn(
-        ChildProcess.make({
-          shell: true,
+        ChildProcess.make("tmux", ["switch-client", "-t", sessionName], {
+          detached: false,
           stdin: "inherit",
           stdout: "inherit",
-          stderr: "inherit",
-        })`tmux switch-client -t ${sessionName}`,
+          stderr: "pipe",
+        }),
       );
 
       const stderr = yield* process.stderr.pipe(Stream.decodeText, Stream.mkString);
@@ -150,12 +150,12 @@ export const TmuxServiceImpl = Layer.effect(
      */
     const attachSession = Effect.fn("tmux.attachSession")(function* (sessionName: string) {
       const process = yield* spawn(
-        ChildProcess.make({
-          shell: true,
+        ChildProcess.make("tmux", ["attach-session", "-t", sessionName], {
+          detached: false,
           stdin: "inherit",
           stdout: "inherit",
-          stderr: "inherit",
-        })`tmux attach-session -t ${sessionName}`,
+          stderr: "pipe",
+        }),
       );
 
       const stderr = yield* process.stderr.pipe(Stream.decodeText, Stream.mkString);
