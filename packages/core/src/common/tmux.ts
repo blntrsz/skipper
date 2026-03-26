@@ -128,6 +128,9 @@ export const TmuxServiceImpl = Layer.effect(
       const process = yield* spawn(
         ChildProcess.make({
           shell: true,
+          stdin: "inherit",
+          stdout: "inherit",
+          stderr: "inherit",
         })`tmux switch-client -t ${sessionName}`,
       );
 
