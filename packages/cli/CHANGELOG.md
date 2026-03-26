@@ -1,5 +1,11 @@
 # @skippercorp/skipper-cli
 
+## 0.2.3
+
+### Patch Changes
+
+- a587615: fix tmux attach by using direct Bun process spawning for interactive attach/switch, validating live tmux clients, and clearing stale tmux env before external session commands
+
 ## 0.2.2
 
 ### Patch Changes
