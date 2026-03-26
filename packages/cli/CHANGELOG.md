@@ -1,5 +1,11 @@
 # @skippercorp/skipper-cli
 
+## 0.2.1
+
+### Patch Changes
+
+- d404408: Patch release for CLI improvements
+
 ## 0.2.0
 
 ### Minor Changes
