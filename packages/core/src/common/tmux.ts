@@ -1,4 +1,8 @@
 import { Effect, Layer, PlatformError, Schema, Scope, ServiceMap } from "effect";
+import {
+  InteractiveCommandError,
+  InteractiveCommandService,
+} from "./adapter/interactive-command.service";
 import type { ProjectModel } from "../workspace";
 
 export class TmuxError extends Schema.TaggedErrorClass<TmuxError>()("TmuxError", {
@@ -43,7 +47,9 @@ export class TmuxService extends ServiceMap.Service<
 
 export const TmuxServiceImpl = Layer.effect(
   TmuxService,
-  Effect.sync(() => {
+  Effect.gen(function* () {
+    const interactiveCommand = yield* InteractiveCommandService;
+
     const processEnv = () => {
       const env: Record<string, string> = {};
 
@@ -125,23 +131,35 @@ export const TmuxServiceImpl = Layer.effect(
       return process.exitCode === 0;
     });
 
-    const attachOutsideSession = Effect.fn("tmux.attachOutsideSession")(function* (
-      sessionName: string,
-    ) {
-      const process = yield* runCommand("tmux", ["attach-session", "-t", `=${sessionName}`], {
-        env: "server",
-        stdin: "inherit",
-        stdout: "inherit",
-        stderr: "pipe",
-      });
+    const attachOutsideSession = Effect.fn("tmux.attachOutsideSession")(
+      function* (sessionName: string) {
+        const process = yield* interactiveCommand.run(
+          "tmux",
+          ["attach-session", "-t", `=${sessionName}`],
+          {
+            env: tmuxServerEnv(),
+            stdin: "inherit",
+            stdout: "inherit",
+            stderr: "pipe",
+          },
+        );
 
-      if (process.exitCode !== 0) {
-        return yield* new TmuxError({
-          message: `Failed to attach to tmux session '${sessionName}'`,
-          stderr: process.stderr,
-        });
-      }
-    });
+        if (process.exitCode !== 0) {
+          return yield* new TmuxError({
+            message: `Failed to attach to tmux session '${sessionName}'`,
+            stderr: process.stderr,
+          });
+        }
+      },
+      Effect.catchTag("InteractiveCommandError", (error: InteractiveCommandError) =>
+        Effect.fail(
+          new TmuxError({
+            message: `Failed to attach to tmux session '${sessionName}'`,
+            stderr: error.stderr,
+          }),
+        ),
+      ),
+    );
 
     /**
      * Checks if tmux is installed by running `which tmux` command. If tmux is not found, it throws a TmuxError with a message indicating that tmux is required for sandbox switch.
@@ -213,12 +231,23 @@ export const TmuxServiceImpl = Layer.effect(
         return yield* attachOutsideSession(sessionName);
       }
 
-      const process = yield* runCommand("tmux", ["switch-client", "-t", `=${sessionName}`], {
-        env: "client",
-        stdin: "inherit",
-        stdout: "inherit",
-        stderr: "pipe",
-      });
+      const process = yield* interactiveCommand
+        .run("tmux", ["switch-client", "-t", `=${sessionName}`], {
+          env: processEnv(),
+          stdin: "inherit",
+          stdout: "inherit",
+          stderr: "pipe",
+        })
+        .pipe(
+          Effect.catchTag("InteractiveCommandError", (error: InteractiveCommandError) =>
+            Effect.fail(
+              new TmuxError({
+                message: `Failed to switch to tmux session '${sessionName}'`,
+                stderr: error.stderr,
+              }),
+            ),
+          ),
+        );
 
       if (process.exitCode !== 0) {
         if (process.stderr.includes("no current client")) {

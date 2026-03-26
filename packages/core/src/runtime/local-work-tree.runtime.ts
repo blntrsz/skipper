@@ -8,6 +8,7 @@ import { SqlSessionRepositoryLayer } from "../session";
 import { SqlSessionServiceLayer } from "../session/adapter/sql-session.service";
 import { SqlTaskServiceLayer } from "../task";
 import { TmuxServiceImpl } from "../common/tmux";
+import { InteractiveCommandServiceLayer } from "../common/adapter/interactive-command.service";
 import { SdkOpenCodeServiceLayer } from "../opencode";
 
 const platformLayer = Layer.mergeAll(BunServices.layer, SqlLayer);
@@ -26,6 +27,9 @@ export const localWorkTreeLayer = Layer.mergeAll(
   sessionLayer,
   taskLayer,
   SdkOpenCodeServiceLayer,
-).pipe(Layer.provideMerge(TmuxServiceImpl), Layer.provideMerge(platformLayer));
+).pipe(
+  Layer.provideMerge(TmuxServiceImpl.pipe(Layer.provideMerge(InteractiveCommandServiceLayer))),
+  Layer.provideMerge(platformLayer),
+);
 
 export const localWorkTreeRuntime = ManagedRuntime.make(localWorkTreeLayer);
