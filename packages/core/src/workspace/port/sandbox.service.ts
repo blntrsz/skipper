@@ -1,6 +1,7 @@
 import { Effect, PlatformError, Schema, Scope, ServiceMap } from "effect";
 import type { ChildProcess } from "effect/unstable/process";
 import type { ProjectModel } from "../domain";
+import type { InteractiveCommandError } from "../../common/adapter/interactive-command.service";
 
 export const SandboxErrorReason = Schema.Union([
   Schema.Literal("UncommittedChanges"),
@@ -50,7 +51,11 @@ export class SandboxService extends ServiceMap.Service<
     attach: (
       project: ProjectModel,
       path: string,
-    ) => Effect.Effect<void, SandboxError | PlatformError.PlatformError, Scope.Scope>;
+    ) => Effect.Effect<
+      void,
+      SandboxError | PlatformError.PlatformError | InteractiveCommandError,
+      Scope.Scope
+    >;
     detach: (
       project: ProjectModel,
     ) => Effect.Effect<void, SandboxError | PlatformError.PlatformError, Scope.Scope>;

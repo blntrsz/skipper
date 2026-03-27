@@ -23,24 +23,13 @@ export class InteractiveCommandService extends ServiceMap.Service<
         stdout?: InteractiveReadable;
         stderr?: InteractiveReadable;
       },
-    ) => Effect.Effect<
-      {
-        exitCode: number;
-        stdout: string;
-        stderr: string;
-      },
-      InteractiveCommandError
-    >;
+    ) => Effect.Effect<string, InteractiveCommandError>;
   }
->()("@skippercorp/core/common/adapter/interactive-command/InteractiveCommandService") {}
+>()("@skippercorp/core/common/adapter/interactive-command.service/InteractiveCommandService") {}
 
 export const InteractiveCommandServiceLayer = Layer.effect(
   InteractiveCommandService,
   Effect.sync(() => {
-    const readStream = (stream?: ReadableStream<Uint8Array> | null) => {
-      return stream ? new Response(stream).text() : Promise.resolve("");
-    };
-
     const run = Effect.fn("interactiveCommand.run")(function* (
       command: string,
       args: ReadonlyArray<string>,
@@ -51,46 +40,24 @@ export const InteractiveCommandServiceLayer = Layer.effect(
         stderr?: InteractiveReadable;
       },
     ) {
-      const child = yield* Effect.try({
-        try: () =>
-          Bun.spawn({
+      return yield* Effect.tryPromise({
+        try: () => {
+          const process = Bun.spawn({
             cmd: [command, ...args],
             env: options?.env,
-            stdin: options?.stdin ?? "ignore",
-            stdout: options?.stdout ?? "pipe",
-            stderr: options?.stderr ?? "pipe",
-            shell: true,
-          } as Bun.SpawnOptions.SpawnOptions<
-            InteractiveWritable,
-            InteractiveReadable,
-            InteractiveReadable
-          > & {
-            cmd: string[];
-            shell: true;
-          }),
+            stdin: options?.stdin ?? "inherit",
+            stdout: options?.stdout ?? "inherit",
+            stderr: options?.stderr ?? "inherit",
+            detached: true,
+          });
+
+          return process.stdout!.text();
+        },
         catch: (error) =>
           new InteractiveCommandError({
             message: error instanceof Error ? error.message : String(error),
           }),
       });
-
-      const stdout = yield* Effect.promise(() =>
-        options?.stdout === "inherit" || options?.stdout === "ignore"
-          ? Promise.resolve("")
-          : readStream(child.stdout),
-      );
-      const stderr = yield* Effect.promise(() =>
-        options?.stderr === "inherit" || options?.stderr === "ignore"
-          ? Promise.resolve("")
-          : readStream(child.stderr),
-      );
-      const exitCode = yield* Effect.promise(() => child.exited);
-
-      return {
-        exitCode,
-        stdout,
-        stderr,
-      };
     });
 
     return {
