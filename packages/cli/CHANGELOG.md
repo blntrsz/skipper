@@ -1,5 +1,11 @@
 # @skippercorp/skipper-cli
 
+## 0.2.7
+
+### Patch Changes
+
+- 5fb5055: final fix for the interactive shell
+
 ## 0.2.6
 
 ### Patch Changes
