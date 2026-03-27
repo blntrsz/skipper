@@ -1,5 +1,11 @@
 # @skippercorp/skipper-cli
 
+## 0.2.4
+
+### Patch Changes
+
+- b1a4da6: fix interactive command
+
 ## 0.2.3
 
 ### Patch Changes
