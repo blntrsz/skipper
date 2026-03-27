@@ -1,7 +1,6 @@
 import { Effect, Layer, Schema, ServiceMap } from "effect";
-
-type InteractiveWritable = "pipe" | "inherit" | "ignore";
-type InteractiveReadable = "pipe" | "inherit" | "ignore";
+// @effect-diagnostics-next-line nodeBuiltinImport:off
+import { spawnSync } from "node:child_process";
 
 export class InteractiveCommandError extends Schema.TaggedErrorClass<InteractiveCommandError>()(
   "InteractiveCommandError",
@@ -14,44 +13,20 @@ export class InteractiveCommandError extends Schema.TaggedErrorClass<Interactive
 export class InteractiveCommandService extends ServiceMap.Service<
   InteractiveCommandService,
   {
-    run: (
-      command: string,
-      args: ReadonlyArray<string>,
-      options?: {
-        env?: Record<string, string>;
-        stdin?: InteractiveWritable;
-        stdout?: InteractiveReadable;
-        stderr?: InteractiveReadable;
-      },
-    ) => Effect.Effect<void, InteractiveCommandError>;
+    run: (command: string) => Effect.Effect<void, InteractiveCommandError>;
   }
 >()("@skippercorp/core/common/adapter/interactive-command.service/InteractiveCommandService") {}
 
 export const InteractiveCommandServiceLayer = Layer.effect(
   InteractiveCommandService,
   Effect.sync(() => {
-    const run = Effect.fn("interactiveCommand.run")(function* (
-      command: string,
-      args: ReadonlyArray<string>,
-      options?: {
-        env?: Record<string, string>;
-        stdin?: InteractiveWritable;
-        stdout?: InteractiveReadable;
-        stderr?: InteractiveReadable;
-      },
-    ) {
+    const run = Effect.fn("interactiveCommand.run")(function* (command: string) {
       return yield* Effect.try({
         try: () => {
-          const process = Bun.spawn({
-            cmd: [command, ...args],
-            env: options?.env,
-            stdin: options?.stdin ?? "inherit",
-            stdout: options?.stdout ?? "inherit",
-            stderr: options?.stderr ?? "inherit",
-            detached: true,
+          return spawnSync(command, {
+            stdio: "inherit",
+            shell: true,
           });
-
-          process.unref();
         },
         catch: (error) =>
           new InteractiveCommandError({

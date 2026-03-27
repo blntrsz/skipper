@@ -128,7 +128,7 @@ export const TmuxServiceImpl = Layer.effect(
      * Switches to an existing tmux session with the given name by running `tmux switch-client -t <sessionName>` command.
      */
     const switchClient = Effect.fn("tmux.switchClient")(function* (sessionName: string) {
-      yield* run(`tmux`, [`switch-client`, `-t`, sessionName]).pipe(
+      yield* run(`tmux switch-client -t ${sessionName}`).pipe(
         Effect.mapError(
           (error) =>
             new TmuxError({
@@ -143,7 +143,7 @@ export const TmuxServiceImpl = Layer.effect(
      * Attaches to an existing tmux session with the given name by running `tmux attach-session -t <sessionName>` command.
      */
     const attachSession = Effect.fn("tmux.attachSession")(function* (sessionName: string) {
-      yield* run(`tmux`, [`attach-session`, `-t`, sessionName]).pipe(
+      yield* run(`tmux attach-session -t ${sessionName}`).pipe(
         Effect.mapError(
           (error) =>
             new TmuxError({
