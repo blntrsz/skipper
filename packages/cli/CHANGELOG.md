@@ -1,5 +1,12 @@
 # @skippercorp/skipper-cli
 
+## 0.2.5
+
+### Patch Changes
+
+- 7527665: Fix tmux attach process handling by removing stdout read from detached process
+- b4c474c: add patch version for fixing interactive command
+
 ## 0.2.4
 
 ### Patch Changes
