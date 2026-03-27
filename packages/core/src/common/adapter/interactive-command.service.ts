@@ -23,7 +23,7 @@ export class InteractiveCommandService extends ServiceMap.Service<
         stdout?: InteractiveReadable;
         stderr?: InteractiveReadable;
       },
-    ) => Effect.Effect<string, InteractiveCommandError>;
+    ) => Effect.Effect<void, InteractiveCommandError>;
   }
 >()("@skippercorp/core/common/adapter/interactive-command.service/InteractiveCommandService") {}
 
@@ -40,7 +40,7 @@ export const InteractiveCommandServiceLayer = Layer.effect(
         stderr?: InteractiveReadable;
       },
     ) {
-      return yield* Effect.tryPromise({
+      return yield* Effect.try({
         try: () => {
           const process = Bun.spawn({
             cmd: [command, ...args],
@@ -51,7 +51,7 @@ export const InteractiveCommandServiceLayer = Layer.effect(
             detached: true,
           });
 
-          return process.stdout!.text();
+          process.unref();
         },
         catch: (error) =>
           new InteractiveCommandError({

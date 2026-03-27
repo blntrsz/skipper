@@ -12,10 +12,7 @@ import {
 import { ChildProcess } from "effect/unstable/process";
 import type { ProjectModel } from "../workspace";
 import { ChildProcessSpawner } from "effect/unstable/process";
-import {
-  InteractiveCommandError,
-  InteractiveCommandService,
-} from "./adapter/interactive-command.service";
+import { InteractiveCommandService } from "./adapter/interactive-command.service";
 
 export class TmuxError extends Schema.TaggedErrorClass<TmuxError>()("TmuxError", {
   message: Schema.String,
@@ -46,10 +43,10 @@ export class TmuxService extends ServiceMap.Service<
     ) => Effect.Effect<void, PlatformError.PlatformError | TmuxError, Scope.Scope>;
     switchClient: (
       sessionName: string,
-    ) => Effect.Effect<void, PlatformError.PlatformError | InteractiveCommandError, never>;
+    ) => Effect.Effect<void, PlatformError.PlatformError | TmuxError, never>;
     attachSession: (
       sessionName: string,
-    ) => Effect.Effect<void, PlatformError.PlatformError | InteractiveCommandError, never>;
+    ) => Effect.Effect<void, PlatformError.PlatformError | TmuxError, never>;
     sessionName: (project: ProjectModel) => string;
     killSession: (
       sessionName: string,
@@ -131,14 +128,30 @@ export const TmuxServiceImpl = Layer.effect(
      * Switches to an existing tmux session with the given name by running `tmux switch-client -t <sessionName>` command.
      */
     const switchClient = Effect.fn("tmux.switchClient")(function* (sessionName: string) {
-      yield* run(`tmux`, [`switch-client`, `-t`, sessionName]);
+      yield* run(`tmux`, [`switch-client`, `-t`, sessionName]).pipe(
+        Effect.mapError(
+          (error) =>
+            new TmuxError({
+              message: `Failed to switch to tmux session '${sessionName}'`,
+              stderr: error.stderr,
+            }),
+        ),
+      );
     });
 
     /**
      * Attaches to an existing tmux session with the given name by running `tmux attach-session -t <sessionName>` command.
      */
     const attachSession = Effect.fn("tmux.attachSession")(function* (sessionName: string) {
-      yield* run(`tmux`, [`attach-session`, `-t`, sessionName]);
+      yield* run(`tmux`, [`attach-session`, `-t`, sessionName]).pipe(
+        Effect.mapError(
+          (error) =>
+            new TmuxError({
+              message: `Failed to attach to tmux session '${sessionName}'`,
+              stderr: error.stderr,
+            }),
+        ),
+      );
     });
 
     const sessionName = (project: ProjectModel) => {
