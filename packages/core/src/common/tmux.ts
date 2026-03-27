@@ -14,7 +14,7 @@ import type { ProjectModel } from "../workspace";
 import { ChildProcessSpawner } from "effect/unstable/process";
 import { InteractiveCommandService } from "./adapter/interactive-command.service";
 
-export class TmuxError extends Schema.TaggedErrorClass<TmuxError>()("TmuxError", {
+class TmuxError extends Schema.TaggedErrorClass<TmuxError>()("TmuxError", {
   message: Schema.String,
   stderr: Schema.optional(Schema.String),
 }) {

@@ -17,7 +17,7 @@ const promptFallback = Prompt.text({
 
 export const joinPromptArgs = (message: ReadonlyArray<string>) => message.join(" ");
 
-export const resolvePrompt = (message: ReadonlyArray<string>) =>
+const resolvePrompt = (message: ReadonlyArray<string>) =>
   message.length > 0 ? Effect.succeed(joinPromptArgs(message)) : Prompt.run(promptFallback);
 
 export const promptWorkspaceCommand = Command.make(

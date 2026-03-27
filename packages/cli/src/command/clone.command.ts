@@ -6,7 +6,7 @@ const githubSshRemotePattern = /^git@github\.com:(?<namespace>[^/]+)\/(?<name>[^
 const invalidGithubSshRemoteMessage =
   "Expected GitHub SSH remote like git@github.com:owner/repo.git";
 
-export type ParsedGithubSshRemote = {
+type ParsedGithubSshRemote = {
   namespace: string;
   name: string;
 };

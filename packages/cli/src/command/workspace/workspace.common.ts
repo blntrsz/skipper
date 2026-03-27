@@ -43,7 +43,7 @@ export const flags = {
   },
 };
 
-export type PickProjectOptions = {
+type PickProjectOptions = {
   branchMode: "new" | "existing";
 };
 
