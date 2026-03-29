@@ -20,7 +20,7 @@ export const InteractiveCommandServiceLayer = Layer.effect(
   Effect.sync(() => {
     const run = Effect.fn("interactiveCommand.run")(function* (command: string[]) {
       yield* Effect.try({
-        try: async () => {
+        try: () => {
           Bun.spawnSync(command, {
             stdio: ["inherit", "inherit", "inherit"],
           });
