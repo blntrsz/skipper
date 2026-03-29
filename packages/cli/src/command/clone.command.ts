@@ -1,6 +1,7 @@
 import { Workspace } from "@skippercorp/core";
 import { Effect } from "effect";
 import { Argument, Command } from "effect/unstable/cli";
+import { provideSandbox, sandboxFlag } from "../common/sandbox";
 
 const githubSshRemotePattern = /^git@github\.com:(?<namespace>[^/]+)\/(?<name>[^/]+)\.git$/;
 const invalidGithubSshRemoteMessage =
@@ -26,13 +27,17 @@ export const parseGithubSshRemote = (remote: string): ParsedGithubSshRemote => {
 export const cloneCommand = Command.make(
   "clone",
   {
+    sandbox: sandboxFlag,
     remote: Argument.string("remote").pipe(
       Argument.withDescription("GitHub SSH remote"),
       Argument.mapTryCatch(parseGithubSshRemote, () => invalidGithubSshRemoteMessage),
     ),
   },
-  ({ remote }) =>
-    Effect.gen(function* () {
-      yield* Workspace.initWorkspace(new Workspace.ProjectModel(remote));
-    }),
+  ({ remote, sandbox }) =>
+    provideSandbox(
+      sandbox,
+      Effect.gen(function* () {
+        yield* Workspace.initWorkspace(new Workspace.ProjectModel({ ...remote, sandbox }));
+      }),
+    ),
 ).pipe(Command.withDescription("Clone repository default branch"));

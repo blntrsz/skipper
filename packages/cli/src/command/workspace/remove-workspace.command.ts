@@ -2,6 +2,7 @@ import { Effect } from "effect";
 import { Command, Flag, Prompt } from "effect/unstable/cli";
 import { flags, pickProject } from "./workspace.common";
 import { Workspace } from "@skippercorp/core";
+import { provideSandbox } from "../../common/sandbox";
 
 const confirmForceRemoval = (project: Workspace.ProjectModel, error: Workspace.SandboxError) =>
   Prompt.run(
@@ -30,19 +31,22 @@ export const removeWorkspaceCommand = Command.make(
     ),
   },
   (config) =>
-    Effect.gen(function* () {
-      const project = yield* pickProject(config.git, { branchMode: "existing" });
+    provideSandbox(
+      config.sandbox,
+      Effect.gen(function* () {
+        const project = yield* pickProject(config.git, config.sandbox, { branchMode: "existing" });
 
-      if (config.force) {
-        return yield* Workspace.destroyWorkspace(project, true);
-      }
+        if (config.force) {
+          return yield* Workspace.destroyWorkspace(project, true);
+        }
 
-      yield* Workspace.destroyWorkspace(project).pipe(
-        Effect.catchTag("SandboxError", (error) =>
-          error.reason === "UncommittedChanges"
-            ? confirmForceRemoval(project, error)
-            : Effect.fail(error),
-        ),
-      );
-    }),
+        yield* Workspace.destroyWorkspace(project).pipe(
+          Effect.catchTag("SandboxError", (error) =>
+            error.reason === "UncommittedChanges"
+              ? confirmForceRemoval(project, error)
+              : Effect.fail(error),
+          ),
+        );
+      }),
+    ),
 ).pipe(Command.withAlias("rm"), Command.withDescription("Remove workspace resources"));

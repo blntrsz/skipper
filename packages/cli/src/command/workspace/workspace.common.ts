@@ -1,6 +1,7 @@
 import { Workspace } from "@skippercorp/core";
 import { Effect, Option, pipe } from "effect";
 import { Flag, Prompt } from "effect/unstable/cli";
+import { sandboxFlag } from "../../common/sandbox";
 
 const MAIN_BRANCH_PICK = "__SKIPPER_MAIN__";
 
@@ -29,6 +30,20 @@ export const buildBranchChoices = (repository: string, options: ReadonlyArray<st
 export const resolvePickedBranch = (branch: string) =>
   branch === MAIN_BRANCH_PICK ? undefined : branch;
 
+export const normalizeRepositoryName = (repository: string, sandbox: Workspace.SandboxKind) =>
+  sandbox === "docker" && repository.endsWith(".docker") ? repository.slice(0, -7) : repository;
+
+export const normalizeBranchChoice = (
+  branch: string | undefined,
+  sandbox: Workspace.SandboxKind,
+) => {
+  if (sandbox !== "docker" || branch === undefined || !branch.endsWith(".docker")) {
+    return branch;
+  }
+
+  return branch.slice(0, -7);
+};
+
 export const flags = {
   git: {
     repository: Flag.optional(
@@ -41,6 +56,7 @@ export const flags = {
       Flag.string("branch").pipe(Flag.withAlias("branchname"), Flag.withDescription("Git branch")),
     ),
   },
+  sandbox: sandboxFlag,
 };
 
 type PickProjectOptions = {
@@ -52,6 +68,7 @@ export const pickProject = Effect.fn(function* (
     repository: Option.Option<string>;
     branch: Option.Option<string>;
   },
+  sandbox: Workspace.SandboxKind,
   options: PickProjectOptions,
 ) {
   const name = yield* Option.match(git.repository, {
@@ -65,7 +82,14 @@ export const pickProject = Effect.fn(function* (
               message: "Select a repository",
               maxPerPage: 10,
               emptyMessage: "No matches",
-              choices: options.map((option) => ({ title: option, value: option })),
+              choices: options
+                .filter((option) =>
+                  sandbox === "docker" ? option.endsWith(".docker") : !option.endsWith(".docker"),
+                )
+                .map((option) => ({
+                  title: normalizeRepositoryName(option, sandbox),
+                  value: normalizeRepositoryName(option, sandbox),
+                })),
             }),
           ),
         ),
@@ -95,12 +119,22 @@ export const pickProject = Effect.fn(function* (
                   message: "Select a branch",
                   maxPerPage: 10,
                   emptyMessage: "No matches",
-                  choices: buildBranchChoices(name, options),
+                  choices: buildBranchChoices(
+                    name,
+                    options.filter((option) =>
+                      sandbox === "docker"
+                        ? option.endsWith(".docker")
+                        : !option.endsWith(".docker"),
+                    ),
+                  ),
                 }),
-              ).pipe(Effect.map(resolvePickedBranch)),
+              ).pipe(
+                Effect.map(resolvePickedBranch),
+                Effect.map((branch) => normalizeBranchChoice(branch, sandbox)),
+              ),
             ),
           ),
   });
 
-  return new Workspace.ProjectModel({ name, branch });
+  return new Workspace.ProjectModel({ name, branch, sandbox });
 });

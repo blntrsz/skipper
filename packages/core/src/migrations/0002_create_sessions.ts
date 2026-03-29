@@ -9,6 +9,7 @@ export default Effect.gen(function* () {
       id TEXT PRIMARY KEY,
       repository TEXT NOT NULL,
       branch TEXT NOT NULL,
+      sandbox TEXT NOT NULL DEFAULT 'worktree',
       title TEXT NOT NULL,
       state TEXT NOT NULL,
       created_at INTEGER NOT NULL,
@@ -29,12 +30,12 @@ export default Effect.gen(function* () {
   `;
 
   yield* sql`
-    CREATE INDEX IF NOT EXISTS idx_sessions_repository_branch
-    ON sessions(repository, branch)
+    CREATE INDEX IF NOT EXISTS idx_sessions_repository_branch_sandbox
+    ON sessions(repository, branch, sandbox)
   `;
   yield* sql`
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_repository_branch_title
-    ON sessions(repository, branch, title)
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_repository_branch_sandbox_title
+    ON sessions(repository, branch, sandbox, title)
   `;
   yield* sql`CREATE INDEX IF NOT EXISTS idx_sessions_state ON sessions(state)`;
   yield* sql`

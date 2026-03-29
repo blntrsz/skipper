@@ -2,6 +2,7 @@ import { Console, Effect } from "effect";
 import { Argument, Command, Prompt } from "effect/unstable/cli";
 import { Workspace } from "@skippercorp/core";
 import { flags, pickProject } from "./workspace.common";
+import { provideSandbox } from "../../common/sandbox";
 
 const messageArgument = Argument.string("message").pipe(
   Argument.withDescription("Prompt to send to OpenCode"),
@@ -27,15 +28,18 @@ export const promptWorkspaceCommand = Command.make(
     message: messageArgument,
   },
   (input) =>
-    Effect.gen(function* () {
-      const project = yield* pickProject(input.git, { branchMode: "existing" });
-      const prompt = yield* resolvePrompt(input.message as ReadonlyArray<string>);
+    provideSandbox(
+      input.sandbox,
+      Effect.gen(function* () {
+        const project = yield* pickProject(input.git, input.sandbox, { branchMode: "existing" });
+        const prompt = yield* resolvePrompt(input.message as ReadonlyArray<string>);
 
-      yield* Workspace.promptWorkspace(project, prompt, (chunk) =>
-        Effect.sync(() => {
-          process.stdout.write(chunk);
-        }),
-      );
-      yield* Console.log("");
-    }),
+        yield* Workspace.promptWorkspace(project, prompt, (chunk) =>
+          Effect.sync(() => {
+            process.stdout.write(chunk);
+          }),
+        );
+        yield* Console.log("");
+      }),
+    ),
 ).pipe(Command.withDescription("Run an OpenCode prompt in a workspace"));

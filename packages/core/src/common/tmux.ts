@@ -155,7 +155,7 @@ export const TmuxServiceImpl = Layer.effect(
     });
 
     const sessionName = (project: ProjectModel) => {
-      return `${project.name}-${project.branch ?? "main"}`;
+      return `${project.name}-${project.branch ?? "main"}-${project.sandboxKind()}`;
     };
 
     const killSession = Effect.fn("tmux.killSession")(function* (sessionName: string) {

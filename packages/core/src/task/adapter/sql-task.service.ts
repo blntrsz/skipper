@@ -1,4 +1,4 @@
-import { Effect, Layer } from "effect";
+import { DateTime, Effect, Layer } from "effect";
 import { TaskService } from "../port/task.service";
 import { TaskRepository } from "../port/task.repository";
 import { make } from "../domain/task.model";
@@ -25,10 +25,11 @@ export const SqlTaskServiceLayer = Layer.effect(
     const update: TaskService["update"] = (id, state) =>
       Effect.gen(function* () {
         const existing = yield* repository.findById(id);
+        const now = yield* DateTime.now;
         return yield* repository.update({
           ...existing,
           state,
-          updatedAt: Date.now(),
+          updatedAt: DateTime.toEpochMillis(now),
         });
       });
 
