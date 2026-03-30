@@ -37,6 +37,7 @@ export const promptWorkspace = Effect.fn("workspace.prompt")(function* (
   const session = yield* sessionService.create({
     repository: project.name,
     branch: normalizeBranch(project),
+    sandbox: project.sandboxKind(),
     title,
     providerSessionId: providerSession.id,
   });

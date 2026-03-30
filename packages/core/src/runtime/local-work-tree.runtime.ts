@@ -10,26 +10,30 @@ import { SqlTaskServiceLayer } from "../task";
 import { TmuxServiceImpl } from "../common/tmux";
 import { InteractiveCommandServiceLayer } from "../common/adapter/interactive-command.service";
 import { SdkOpenCodeServiceLayer } from "../opencode";
+import { DEFAULT_SANDBOX_KIND, type SandboxKind } from "../workspace/domain";
 
 const platformLayer = Layer.mergeAll(BunServices.layer, SqlLayer);
 
-const workspaceLayer = Layer.provideMerge(
-  WorkTreeSandboxServiceLayer,
-  WorkTreeFileSystemServiceLayer,
-);
+const sandboxLayerForKind = (_sandbox: SandboxKind) => WorkTreeSandboxServiceLayer;
+
+export const workspaceLayerForSandbox = (sandbox: SandboxKind = DEFAULT_SANDBOX_KIND) =>
+  Layer.mergeAll(WorkTreeFileSystemServiceLayer, sandboxLayerForKind(sandbox));
 
 const sessionLayer = Layer.provide(SqlSessionServiceLayer, SqlSessionRepositoryLayer);
 
 const taskLayer = Layer.provide(SqlTaskServiceLayer, SqlTaskRepositoryLayer);
 
-export const localWorkTreeLayer = Layer.mergeAll(
-  workspaceLayer,
+export const localRuntimeBaseLayer = Layer.mergeAll(
   sessionLayer,
   taskLayer,
   SdkOpenCodeServiceLayer,
 ).pipe(
   Layer.provideMerge(TmuxServiceImpl.pipe(Layer.provideMerge(InteractiveCommandServiceLayer))),
   Layer.provideMerge(platformLayer),
+);
+
+export const localWorkTreeLayer = workspaceLayerForSandbox().pipe(
+  Layer.provideMerge(localRuntimeBaseLayer),
 );
 
 export const localWorkTreeRuntime = ManagedRuntime.make(localWorkTreeLayer);

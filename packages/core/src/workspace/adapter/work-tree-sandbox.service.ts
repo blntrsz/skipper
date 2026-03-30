@@ -145,12 +145,12 @@ export const WorkTreeSandboxServiceLayer = Layer.effect(
       );
     });
 
-    return {
+    return SandboxService.of({
       execute,
       init,
       destroy,
       attach,
       detach,
-    };
+    });
   }),
 );
