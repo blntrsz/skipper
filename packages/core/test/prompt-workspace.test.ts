@@ -9,9 +9,9 @@ import {
   isSessionCompleteEvent,
 } from "../src/opencode/adapter/sdk-opencode.service";
 import { promptWorkspace } from "../src/workspace/use-case/prompt-workspace.use-case";
-import { FileSystemService } from "../src/workspace/port/file-system.service";
 import { OpenCodeService } from "../src/opencode";
 import { SessionService } from "../src/session/port/session.service";
+import { WorkspaceRegistryService } from "../src/workspace/port/workspace-registry.service";
 
 describe("promptWorkspace", () => {
   it("detects assistant deltas and completion status events", () => {
@@ -87,6 +87,7 @@ describe("promptWorkspace", () => {
     Effect.gen(function* () {
       const calls = {
         cwd: [] as Array<string>,
+        containers: [] as Array<string | undefined>,
         sessionCreates: [] as Array<{
           repository: string;
           branch: string;
@@ -106,27 +107,29 @@ describe("promptWorkspace", () => {
         }),
       ).pipe(
         Effect.provideService(
-          FileSystemService,
-          FileSystemService.of({
-            fs: Effect.die("unused"),
-            init: () => Effect.void,
-            destroy: () => Effect.void,
-            rootCwd: () => Effect.die("unused"),
-            mainCwd: () => Effect.die("unused"),
-            mainProjectCwd: () => Effect.die("unused"),
-            branchCwd: () => Effect.die("unused"),
-            branchProjectCwd: () => Effect.succeed("/worktrees/skipper/skipper.feat/test"),
+          WorkspaceRegistryService,
+          WorkspaceRegistryService.of({
+            resolve: () =>
+              Effect.succeed({
+                project,
+                cwd: "/worktrees/skipper/skipper.feat/test",
+                sandbox: "worktree",
+                containerName: "unused-container",
+              }),
+            listMainProjects: () => Effect.die("unused"),
+            listBranchProjects: () => Effect.die("unused"),
           }),
         ),
         Effect.provideService(
           OpenCodeService,
           OpenCodeService.of({
-            createSession: (cwd) =>
+            createSession: (workspace) =>
               Effect.sync(() => {
-                calls.cwd.push(cwd);
+                calls.cwd.push(workspace.cwd);
+                calls.containers.push(workspace.containerName);
                 return { id: "provider-1", title: "ignored" };
               }),
-            promptSession: (_cwd, _sessionId, _prompt, onTextDelta) =>
+            promptSession: (_workspace, _sessionId, _prompt, onTextDelta) =>
               onTextDelta("hello ").pipe(Effect.andThen(onTextDelta("world"))),
             listMessages: () =>
               Effect.succeed([
@@ -190,6 +193,7 @@ describe("promptWorkspace", () => {
       );
 
       expect(calls.cwd).toEqual(["/worktrees/skipper/skipper.feat/test"]);
+      expect(calls.containers).toEqual(["unused-container"]);
       expect(calls.sessionCreates).toHaveLength(1);
       expect(calls.sessionCreates[0]?.repository).toBe("skipper");
       expect(calls.sessionCreates[0]?.branch).toBe("feat/test");
@@ -216,16 +220,16 @@ describe("promptWorkspace", () => {
       const exit = yield* Effect.exit(
         promptWorkspace(project, "Explain main").pipe(
           Effect.provideService(
-            FileSystemService,
-            FileSystemService.of({
-              fs: Effect.die("unused"),
-              init: () => Effect.void,
-              destroy: () => Effect.void,
-              rootCwd: () => Effect.die("unused"),
-              mainCwd: () => Effect.die("unused"),
-              mainProjectCwd: () => Effect.succeed("/repos/skipper"),
-              branchCwd: () => Effect.die("unused"),
-              branchProjectCwd: () => Effect.die("unused"),
+            WorkspaceRegistryService,
+            WorkspaceRegistryService.of({
+              resolve: () =>
+                Effect.succeed({
+                  project,
+                  cwd: "/repos/skipper",
+                  sandbox: "worktree",
+                }),
+              listMainProjects: () => Effect.die("unused"),
+              listBranchProjects: () => Effect.die("unused"),
             }),
           ),
           Effect.provideService(

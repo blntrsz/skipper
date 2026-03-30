@@ -5,6 +5,7 @@ import {
   OpenCodeService,
   type OpenCodeTranscriptMessage,
 } from "../port/opencode.service";
+import type { WorkspaceHandle } from "../../workspace/port/workspace-registry.service";
 
 const isTextPart = (part: Part): part is Extract<Part, { type: "text" }> => part.type === "text";
 
@@ -133,7 +134,11 @@ const getSessionError = (event: unknown, sessionId: string) => {
   return isRecord(event.properties.error) ? event.properties.error : undefined;
 };
 
-const createError = (reason: OpenCodeError["reason"], message: string, cause?: unknown) =>
+export const createOpenCodeError = (
+  reason: OpenCodeError["reason"],
+  message: string,
+  cause?: unknown,
+) =>
   new OpenCodeError({
     reason,
     message,
@@ -143,7 +148,7 @@ const createError = (reason: OpenCodeError["reason"], message: string, cause?: u
 const formatUnknownError = (error: unknown) =>
   error instanceof Error ? error.message : "Unknown OpenCode error";
 
-const mapClientError = (error: unknown) => {
+export const mapOpenCodeError = (error: unknown) => {
   if (error instanceof OpenCodeError) {
     return error;
   }
@@ -151,7 +156,7 @@ const mapClientError = (error: unknown) => {
   const message = formatUnknownError(error);
 
   if (message.includes("spawn opencode ENOENT")) {
-    return createError(
+    return createOpenCodeError(
       "BinaryMissing",
       "OpenCode binary missing. Install `opencode` and retry.",
       error,
@@ -159,32 +164,32 @@ const mapClientError = (error: unknown) => {
   }
 
   if (message.includes("ProviderAuthError") || message.includes("auth")) {
-    return createError(
+    return createOpenCodeError(
       "AuthenticationFailed",
       "OpenCode auth missing. Run `opencode auth login` and retry.",
       error,
     );
   }
 
-  return createError("ExecutionFailed", message, error);
+  return createOpenCodeError("ExecutionFailed", message, error);
 };
 
 const withClient = <A>(
-  cwd: string,
+  workspace: WorkspaceHandle,
   f: (client: ReturnType<typeof createOpencodeClient>) => Effect.Effect<A, OpenCodeError, never>,
 ): Effect.Effect<A, OpenCodeError, never> =>
   Effect.gen(function* () {
     const server = yield* Effect.acquireRelease(
       Effect.tryPromise<Awaited<ReturnType<typeof createOpencodeServer>>, OpenCodeError>({
         try: () => createOpencodeServer({ port: 0 }),
-        catch: mapClientError,
+        catch: mapOpenCodeError,
       }),
       (server) => Effect.sync(() => server.close()),
     );
 
     const client = createOpencodeClient({
       baseUrl: server.url,
-      directory: cwd,
+      directory: workspace.cwd,
     });
 
     return yield* f(client);
@@ -196,7 +201,7 @@ const extractText = (parts: ReadonlyArray<Part>) =>
     .map((part) => (isTextPart(part) ? part.text : ""))
     .join("");
 
-const extractTranscript = (
+export const extractTranscript = (
   messages: ReadonlyArray<{ info: { role: string }; parts: ReadonlyArray<Part> }>,
 ): ReadonlyArray<OpenCodeTranscriptMessage> =>
   messages.flatMap((message) => {
@@ -216,20 +221,20 @@ const extractTranscript = (
 export const SdkOpenCodeServiceLayer = Layer.succeed(
   OpenCodeService,
   OpenCodeService.of({
-    createSession: (cwd, title) =>
-      withClient(cwd, (client) =>
+    createSession: (workspace, title) =>
+      withClient(workspace, (client) =>
         Effect.gen(function* () {
           const result = yield* Effect.tryPromise<
             Awaited<ReturnType<typeof client.session.create>>,
             OpenCodeError
           >({
             try: () => client.session.create({ body: { title } }),
-            catch: mapClientError,
+            catch: mapOpenCodeError,
           });
 
           if (!result.data) {
             return yield* Effect.fail(
-              createError("ExecutionFailed", "OpenCode session not created"),
+              createOpenCodeError("ExecutionFailed", "OpenCode session not created"),
             );
           }
 
@@ -239,8 +244,8 @@ export const SdkOpenCodeServiceLayer = Layer.succeed(
           };
         }),
       ),
-    promptSession: (cwd, sessionId, prompt, onTextDelta) =>
-      withClient(cwd, (client) =>
+    promptSession: (workspace, sessionId, prompt, onTextDelta) =>
+      withClient(workspace, (client) =>
         Effect.gen(function* () {
           const state = createStreamState();
           const eventsController = new AbortController();
@@ -249,7 +254,7 @@ export const SdkOpenCodeServiceLayer = Layer.succeed(
             OpenCodeError
           >({
             try: () => client.event.subscribe({ signal: eventsController.signal }),
-            catch: mapClientError,
+            catch: mapOpenCodeError,
           });
 
           yield* Effect.tryPromise({
@@ -260,7 +265,7 @@ export const SdkOpenCodeServiceLayer = Layer.succeed(
                   parts: [{ type: "text", text: prompt }],
                 },
               }),
-            catch: mapClientError,
+            catch: mapOpenCodeError,
           });
 
           yield* Effect.tryPromise({
@@ -286,7 +291,7 @@ export const SdkOpenCodeServiceLayer = Layer.succeed(
                     errorData && typeof errorData.message === "string"
                       ? errorData.message
                       : "OpenCode session failed";
-                  throw createError(
+                  throw createOpenCodeError(
                     error?.name === "ProviderAuthError"
                       ? "AuthenticationFailed"
                       : "ExecutionFailed",
@@ -297,9 +302,12 @@ export const SdkOpenCodeServiceLayer = Layer.succeed(
               }
 
               eventsController.abort();
-              throw createError("ExecutionFailed", "OpenCode event stream ended unexpectedly");
+              throw createOpenCodeError(
+                "ExecutionFailed",
+                "OpenCode event stream ended unexpectedly",
+              );
             },
-            catch: mapClientError,
+            catch: mapOpenCodeError,
           }).pipe(
             Effect.onInterrupt(() =>
               Effect.sync(() => eventsController.abort()).pipe(
@@ -321,7 +329,7 @@ export const SdkOpenCodeServiceLayer = Layer.succeed(
             OpenCodeError
           >({
             try: () => client.session.messages({ path: { id: sessionId } }),
-            catch: mapClientError,
+            catch: mapOpenCodeError,
           });
 
           return extractTranscript(result.data ?? []);

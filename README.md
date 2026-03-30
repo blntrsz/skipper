@@ -5,10 +5,10 @@
 <h1 align="center">Skipper</h1>
 
 <p align="center">
-  Local repo workspace CLI for Git worktrees + tmux.
+  Local repo workspace CLI for Git worktrees, Docker sandboxes, and tmux.
 </p>
 
-Skipper is a local-first CLI for working across GitHub repositories and branch workspaces without juggling paths by hand. It clones repositories into a shared local root, creates per-branch Git worktrees, opens or switches into matching tmux sessions, and runs shell commands in the right checkout.
+Skipper is a local-first CLI for working across GitHub repositories and branch workspaces without juggling paths by hand. It clones repositories into a shared local root, creates per-branch Git worktrees or Docker sandboxes, opens or switches into matching sessions, and runs shell commands in the right checkout.
 
 By default, Skipper keeps:
 
@@ -20,6 +20,7 @@ If you omit `--repository` or `--branch` in an interactive terminal, Skipper let
 ## Requirements
 
 - `bun`
+- `docker` (optional, for `--sandbox docker`)
 - `git`
 - `gh`
 - `opencode`
@@ -45,8 +46,14 @@ bunx @skippercorp/skipper-cli --help
 # Clone into ~/.local/share/github/<repo>
 sk clone git@github.com:owner/repo.git
 
+# Clone and create a Docker-backed main workspace container
+sk clone git@github.com:owner/repo.git --sandbox docker
+
 # Create a workspace for a feature branch
 sk workspace create --repository repo --branch feature/my-change
+
+# Create the same workspace in Docker
+sk workspace create --repository repo --branch feature/my-change --sandbox docker
 
 # Jump into a tmux session for that workspace
 sk workspace attach --repository repo --branch feature/my-change
@@ -58,7 +65,7 @@ sk workspace run --repository repo --branch feature/my-change --command "bun tes
 sk workspace prompt --repository repo --branch feature/my-change "Explain this codebase"
 ```
 
-`main` is treated specially: it uses the repository checkout directly, while other branches use dedicated worktrees.
+`main` is treated specially: it uses the repository checkout directly for the default worktree backend, while other branches use dedicated worktrees. Docker support is additive behind `--sandbox docker`, with worktree remaining the default backend.
 
 Before first `workspace prompt` use, configure OpenCode auth with `opencode auth login`.
 

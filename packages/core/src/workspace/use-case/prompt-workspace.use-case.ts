@@ -1,8 +1,8 @@
 import { DateTime, Effect } from "effect";
 import type { ProjectModel } from "../domain/project.model";
-import { FileSystemService } from "../port/file-system.service";
 import { OpenCodeService } from "../../opencode";
 import { SessionService } from "../../session/port/session.service";
+import { WorkspaceRegistryService } from "../port/workspace-registry.service";
 
 const MAX_TITLE_LENGTH = 48;
 
@@ -15,24 +15,17 @@ const buildTitle = Effect.fn("workspace.prompt.buildTitle")(function* (prompt: s
   return `${snippet} ${DateTime.toEpochMillis(now).toString(36)}`;
 });
 
-const resolveCwd = Effect.fn("workspace.prompt.resolveCwd")(function* (project: ProjectModel) {
-  const fileSystem = yield* FileSystemService;
-
-  return yield* project.isMain()
-    ? fileSystem.mainProjectCwd(project)
-    : fileSystem.branchProjectCwd(project);
-});
-
 export const promptWorkspace = Effect.fn("workspace.prompt")(function* (
   project: ProjectModel,
   prompt: string,
   onTextDelta: (chunk: string) => Effect.Effect<void, never, never> = () => Effect.void,
 ) {
-  const cwd = yield* resolveCwd(project);
+  const registry = yield* WorkspaceRegistryService;
+  const workspace = yield* registry.resolve(project);
   const openCode = yield* OpenCodeService;
   const sessionService = yield* SessionService;
   const title = yield* buildTitle(prompt);
-  const providerSession = yield* openCode.createSession(cwd, title);
+  const providerSession = yield* openCode.createSession(workspace, title);
 
   const session = yield* sessionService.create({
     repository: project.name,
@@ -45,14 +38,14 @@ export const promptWorkspace = Effect.fn("workspace.prompt")(function* (
 
   const importTranscript = () =>
     Effect.gen(function* () {
-      const messages = yield* openCode.listMessages(cwd, providerSession.id);
+      const messages = yield* openCode.listMessages(workspace, providerSession.id);
 
       for (const message of messages) {
         yield* sessionService.addMessage(session.id, message.role, message.content);
       }
     });
 
-  const program = openCode.promptSession(cwd, providerSession.id, prompt, onTextDelta).pipe(
+  const program = openCode.promptSession(workspace, providerSession.id, prompt, onTextDelta).pipe(
     Effect.tap(importTranscript),
     Effect.tap(() => sessionService.updateState(session.id, "idle")),
     Effect.catch((error) =>
@@ -67,7 +60,7 @@ export const promptWorkspace = Effect.fn("workspace.prompt")(function* (
   return yield* program.pipe(
     Effect.onInterrupt(() =>
       openCode
-        .abortSession(cwd, providerSession.id)
+        .abortSession(workspace, providerSession.id)
         .pipe(Effect.andThen(sessionService.updateState(session.id, "stuck"))),
     ),
     Effect.as(session),

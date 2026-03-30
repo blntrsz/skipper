@@ -7,6 +7,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./common/sql": "./src/common/sql.ts",
+    "./runtime/docker.runtime": "./src/runtime/docker.runtime.ts",
     "./runtime/local-work-tree.runtime": "./src/runtime/local-work-tree.runtime.ts",
     "./common/adapter/*": "./src/common/adapter/*.ts",
     "./*": "./src/*/index.ts"
