@@ -110,7 +110,11 @@ export const WorkTreeSandboxServiceLayer = Layer.effect(
           yield* tmux.createSession(sessionName, path);
         }
 
-        yield* tmux.attachSession(sessionName);
+        if (yield* tmux.isInSession()) {
+          yield* tmux.switchClient(sessionName);
+        } else {
+          yield* tmux.attachSession(sessionName);
+        }
       },
       Effect.catchTag("TmuxError", (e) =>
         Effect.fail(
