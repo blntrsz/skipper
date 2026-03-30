@@ -1,5 +1,11 @@
 # @skippercorp/skipper-cli
 
+## 0.2.8
+
+### Patch Changes
+
+- d590ef4: Fix tmux switch client when in tmux session
+
 ## 0.2.7
 
 ### Patch Changes
