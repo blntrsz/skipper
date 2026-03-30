@@ -3,6 +3,9 @@ import { Flag, GlobalFlag } from "effect/unstable/cli";
 import { ChildProcessSpawner } from "effect/unstable/process";
 import { noopConsole } from "@skippercorp/core/common/adapter/noop-console";
 
+const sandboxChoices = ["worktree", "docker"] as const;
+export type SandboxBackend = (typeof sandboxChoices)[number];
+
 export const Silent = GlobalFlag.setting("silent")({
   flag: Flag.boolean("silent").pipe(
     Flag.withDefault(false),
@@ -57,3 +60,27 @@ export const DryRunLayer = Layer.effect(
     );
   }),
 );
+
+export const Sandbox = GlobalFlag.setting("sandbox")({
+  flag: Flag.choice("sandbox", sandboxChoices).pipe(
+    Flag.withDefault("worktree"),
+    Flag.withDescription("Sandbox backend to use"),
+  ),
+});
+
+export const resolveSandboxFromArgv = (argv: ReadonlyArray<string>): SandboxBackend => {
+  for (let index = 0; index < argv.length; index++) {
+    const value = argv[index];
+
+    if (value === "--sandbox") {
+      const next = argv[index + 1];
+      return next === "docker" ? "docker" : "worktree";
+    }
+
+    if (value?.startsWith("--sandbox=")) {
+      return value.slice("--sandbox=".length) === "docker" ? "docker" : "worktree";
+    }
+  }
+
+  return "worktree";
+};

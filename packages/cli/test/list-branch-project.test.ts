@@ -1,5 +1,9 @@
 /** @effect-diagnostics strictEffectProvide:off */
-import { listBranchProject, WorkTreeFileSystemServiceLayer } from "@skippercorp/core/workspace";
+import {
+  listBranchProject,
+  WorkTreeFileSystemServiceLayer,
+  WorkTreeWorkspaceRegistryServiceLayer,
+} from "@skippercorp/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, FileSystem, Path } from "effect";
 import { homedir } from "node:os";
@@ -12,6 +16,7 @@ describe("listBranchProject", () => {
       const created: Array<{ path: string; recursive: boolean | undefined }> = [];
 
       const result = yield* listBranchProject("chronops").pipe(
+        Effect.provide(WorkTreeWorkspaceRegistryServiceLayer),
         Effect.provide(WorkTreeFileSystemServiceLayer),
         Effect.provide(Path.layer),
         Effect.provide(

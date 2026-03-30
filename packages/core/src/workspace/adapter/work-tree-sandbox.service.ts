@@ -4,6 +4,7 @@ import type { SandboxDestroyInput, SandboxInitInput } from "../port/sandbox.serv
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 import { TmuxService } from "../../common/tmux";
 import type { ProjectModel } from "../domain";
+import type { WorkspaceHandle } from "../port/workspace-registry.service";
 
 export const WorkTreeSandboxServiceLayer = Layer.effect(
   SandboxService,
@@ -12,19 +13,18 @@ export const WorkTreeSandboxServiceLayer = Layer.effect(
     const path = yield* Path.Path;
     const tmux = yield* TmuxService;
 
-    const execute = (options: ChildProcess.CommandOptions) =>
-      Effect.fn("WorkTreeSandboxService.execute")(function* (
-        templates: TemplateStringsArray,
-        ...expressions: readonly ChildProcess.TemplateExpression[]
-      ) {
+    const runCommand = Effect.fn("WorkTreeSandboxService.runCommand")(function* (
+      command: string,
+      options: ChildProcess.CommandOptions = {},
+    ) {
         const handle = yield* spawn(
           ChildProcess.make({
             ...options,
             stdin: options.stdin ?? "pipe",
             stdout: options.stdout ?? "pipe",
             stderr: options.stderr ?? "pipe",
-            shell: options.shell ?? true,
-          })(templates, ...expressions),
+            shell: false,
+          })`sh -lc ${command}`,
         );
 
         let result = "";
@@ -44,20 +44,31 @@ export const WorkTreeSandboxServiceLayer = Layer.effect(
         }
       });
 
+    const execute = Effect.fn("WorkTreeSandboxService.execute")(function* (
+      workspace: WorkspaceHandle,
+      command: string,
+      options: ChildProcess.CommandOptions = {},
+    ) {
+      yield* runCommand(command, {
+        ...options,
+        cwd: workspace.cwd,
+      });
+    });
+
     const init = Effect.fn("WorkTreeSandboxService.init")(function* (input: SandboxInitInput) {
       const { project, mainProjectPath, mainExists, branchPath } = input;
 
       if (!mainExists) {
         const gitLink = `git@github.com:${project.namespace}/${project.name}.git`;
-        yield* execute({
+        yield* runCommand(`git clone ${gitLink} ${mainProjectPath}`, {
           cwd: path.dirname(mainProjectPath),
-        })`git clone ${gitLink} ${mainProjectPath}`;
+        });
       }
 
       if (project.hasBranch() && branchPath !== undefined) {
-        yield* execute({
+        yield* runCommand(`git worktree add ${branchPath} -b ${project.branch}`, {
           cwd: mainProjectPath,
-        })`git worktree add ${branchPath} -b ${project.branch}`;
+        });
       }
     });
 
@@ -72,8 +83,8 @@ export const WorkTreeSandboxServiceLayer = Layer.effect(
 
       yield* (
         force
-          ? execute({ cwd: mainProjectPath })`git worktree remove --force ${branchPath}`
-          : execute({ cwd: mainProjectPath })`git worktree remove ${branchPath}`
+          ? runCommand(`git worktree remove --force ${branchPath}`, { cwd: mainProjectPath })
+          : runCommand(`git worktree remove ${branchPath}`, { cwd: mainProjectPath })
       ).pipe(
         Effect.catchTag("SandboxError", (e) => {
           if (e.message.includes(branchPath) && e.message.includes("not a working tree")) {
@@ -99,7 +110,8 @@ export const WorkTreeSandboxServiceLayer = Layer.effect(
     });
 
     const attach = Effect.fn("WorkTreeSandboxService.attach")(
-      function* (project: ProjectModel, path: string) {
+      function* (workspace: WorkspaceHandle) {
+        const { project, cwd } = workspace;
         yield* tmux.ensureInstalled();
 
         const sessionName = tmux.sessionName(project);
@@ -107,7 +119,7 @@ export const WorkTreeSandboxServiceLayer = Layer.effect(
         const hasTmuxSession = yield* tmux.hasSession(sessionName);
 
         if (!hasTmuxSession) {
-          yield* tmux.createSession(sessionName, path);
+          yield* tmux.createSession(sessionName, cwd);
         }
 
         if (yield* tmux.isInSession()) {

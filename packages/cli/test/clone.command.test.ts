@@ -44,7 +44,7 @@ describe("clone command", () => {
                 initInput = input;
               }),
             destroy: () => Effect.die("unused"),
-            execute: () => () => Effect.die("unused"),
+            execute: () => Effect.die("unused"),
             attach: () => Effect.die("unused"),
             detach: () => Effect.die("unused"),
           }),

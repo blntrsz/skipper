@@ -1,4 +1,5 @@
 import { Effect, Schema, ServiceMap } from "effect";
+import type { WorkspaceHandle } from "../../workspace/port/workspace-registry.service";
 
 export const OpenCodeErrorReason = Schema.Union([
   Schema.Literal("AuthenticationFailed"),
@@ -28,20 +29,20 @@ export type OpenCodeTranscriptMessage = {
 
 export interface OpenCodeService {
   createSession: (
-    cwd: string,
+    workspace: WorkspaceHandle,
     title: string,
   ) => Effect.Effect<OpenCodeSession, OpenCodeError, never>;
   promptSession: (
-    cwd: string,
+    workspace: WorkspaceHandle,
     sessionId: string,
     prompt: string,
     onTextDelta: (chunk: string) => Effect.Effect<void, never, never>,
   ) => Effect.Effect<void, OpenCodeError, never>;
   listMessages: (
-    cwd: string,
+    workspace: WorkspaceHandle,
     sessionId: string,
   ) => Effect.Effect<ReadonlyArray<OpenCodeTranscriptMessage>, OpenCodeError, never>;
-  abortSession: (cwd: string, sessionId: string) => Effect.Effect<void, never, never>;
+  abortSession: (workspace: WorkspaceHandle, sessionId: string) => Effect.Effect<void, never, never>;
 }
 
 export const OpenCodeService = ServiceMap.Service<OpenCodeService>("OpenCodeService");
