@@ -1,22 +1,24 @@
 import { Layer, ManagedRuntime } from "effect";
 import { WorkTreeFileSystemServiceLayer } from "../workspace/adapter/work-tree-filesystem.use-case";
-import { WorkTreeSandboxServiceLayer } from "../workspace/adapter/work-tree-sandbox.service";
+import { DockerSandboxServiceLayer } from "../workspace/adapter/docker-sandbox.service";
 import { BunServices } from "@effect/platform-bun";
 import { SqlTaskRepositoryLayer } from "../task/adapter/sql-task.repository";
 import { SqlLayer } from "../common/sql";
 import { SqlSessionRepositoryLayer } from "../session";
 import { SqlSessionServiceLayer } from "../session/adapter/sql-session.service";
 import { SqlTaskServiceLayer } from "../task";
-import { TmuxServiceImpl } from "../common/tmux";
 import { InteractiveCommandServiceLayer } from "../common/adapter/interactive-command.service";
 import { SdkOpenCodeServiceLayer } from "../opencode";
+import { DockerServiceLayer } from "../common/docker";
 
 const platformLayer = Layer.mergeAll(BunServices.layer, SqlLayer);
 
-const sandboxInfraLayer = TmuxServiceImpl.pipe(Layer.provideMerge(InteractiveCommandServiceLayer));
+const dockerInfraLayer = DockerServiceLayer.pipe(
+  Layer.provideMerge(InteractiveCommandServiceLayer),
+);
 
 const workspaceLayer = Layer.provideMerge(
-  Layer.provide(WorkTreeSandboxServiceLayer, sandboxInfraLayer),
+  Layer.provide(DockerSandboxServiceLayer, dockerInfraLayer),
   WorkTreeFileSystemServiceLayer,
 );
 
@@ -24,11 +26,11 @@ const sessionLayer = Layer.provide(SqlSessionServiceLayer, SqlSessionRepositoryL
 
 const taskLayer = Layer.provide(SqlTaskServiceLayer, SqlTaskRepositoryLayer);
 
-export const localWorkTreeLayer = Layer.mergeAll(
+export const dockerSandboxLayer = Layer.mergeAll(
   workspaceLayer,
   sessionLayer,
   taskLayer,
   SdkOpenCodeServiceLayer,
 ).pipe(Layer.provideMerge(platformLayer));
 
-export const localWorkTreeRuntime = ManagedRuntime.make(localWorkTreeLayer);
+export const dockerSandboxRuntime = ManagedRuntime.make(dockerSandboxLayer);
