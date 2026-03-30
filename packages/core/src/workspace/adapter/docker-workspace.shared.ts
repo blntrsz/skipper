@@ -6,14 +6,17 @@ export const DOCKER_SANDBOX_PORT = 4096;
 export const DOCKER_SANDBOX_WORKDIR = "/workspace";
 
 const sanitizeNamePart = (value: string) => {
-  const sanitized = value.toLowerCase().replaceAll(/[^a-z0-9_.-]+/g, "-").replaceAll(/^-+|-+$/g, "");
+  const sanitized = value
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9_.-]+/g, "-")
+    .replaceAll(/^-+|-+$/g, "");
   return sanitized.length > 0 ? sanitized : "workspace";
 };
 
-const branchLabelValue = (project: ProjectModel) => project.branch ?? "main";
+const resolveBranchLabel = (project: ProjectModel) => project.branch ?? "main";
 
 export const dockerContainerName = (project: ProjectModel) =>
-  `skipper-${sanitizeNamePart(project.name)}-${sanitizeNamePart(branchLabelValue(project))}`;
+  `skipper-${sanitizeNamePart(project.name)}-${sanitizeNamePart(resolveBranchLabel(project))}`;
 
 export const dockerWorkspaceCwd = (project: ProjectModel) =>
   `${DOCKER_SANDBOX_WORKDIR}/${project.name}`;
@@ -25,11 +28,12 @@ export const dockerWorkspaceHandle = (project: ProjectModel): WorkspaceHandle =>
   containerName: dockerContainerName(project),
 });
 
-export const dockerWorkspaceEntry = (repository: string, branch: string) => `${repository}.${branch}`;
+export const dockerWorkspaceEntry = (repository: string, branch: string) =>
+  `${repository}.${branch}`;
 
 export const dockerWorkspaceLabels = (project: ProjectModel) => ({
   "skipper.backend": "docker",
   "skipper.repository": project.name,
-  "skipper.branch": branchLabelValue(project),
+  "skipper.branch": resolveBranchLabel(project),
   "skipper.workspace": project.isMain() ? "main" : "branch",
 });

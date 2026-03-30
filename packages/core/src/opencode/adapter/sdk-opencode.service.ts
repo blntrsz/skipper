@@ -134,7 +134,11 @@ const getSessionError = (event: unknown, sessionId: string) => {
   return isRecord(event.properties.error) ? event.properties.error : undefined;
 };
 
-export const createOpenCodeError = (reason: OpenCodeError["reason"], message: string, cause?: unknown) =>
+export const createOpenCodeError = (
+  reason: OpenCodeError["reason"],
+  message: string,
+  cause?: unknown,
+) =>
   new OpenCodeError({
     reason,
     message,

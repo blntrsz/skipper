@@ -22,14 +22,12 @@ export const DockerFileSystemServiceLayer = Layer.effect(
           yield* fs.makeDirectory(directory, { recursive: true });
         }
       }).pipe(
-        Effect.catchTag(
-          "PlatformError",
-          (error) =>
-            Effect.fail(
-              new FileSystemError({
-                message: error.message,
-              }),
-            ),
+        Effect.catchTag("PlatformError", (error) =>
+          Effect.fail(
+            new FileSystemError({
+              message: error.message,
+            }),
+          ),
         ),
       );
     });
@@ -50,7 +48,9 @@ export const DockerFileSystemServiceLayer = Layer.effect(
       return path.join(yield* mainCwd(), project.name);
     });
 
-    const branchCwd = Effect.fn("DockerFileSystemService.branchCwd")(function* (repository: string) {
+    const branchCwd = Effect.fn("DockerFileSystemService.branchCwd")(function* (
+      repository: string,
+    ) {
       return path.join(yield* rootCwd(), DEFAULT_WORK_TREE_ROOT, repository);
     });
 
@@ -70,7 +70,9 @@ export const DockerFileSystemServiceLayer = Layer.effect(
       );
     });
 
-    const destroy = Effect.fn("DockerFileSystemService.destroy")(function* (_project: ProjectModel) {
+    const destroy = Effect.fn("DockerFileSystemService.destroy")(function* (
+      _project: ProjectModel,
+    ) {
       yield* Effect.void;
     });
 

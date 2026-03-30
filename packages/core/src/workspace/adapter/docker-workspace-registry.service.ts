@@ -1,7 +1,10 @@
 import { Effect, Layer, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 import { dockerWorkspaceEntry, dockerWorkspaceHandle } from "./docker-workspace.shared";
-import { WorkspaceRegistryError, WorkspaceRegistryService } from "../port/workspace-registry.service";
+import {
+  WorkspaceRegistryError,
+  WorkspaceRegistryService,
+} from "../port/workspace-registry.service";
 
 const DOCKER_FILTER_PREFIX = "label=skipper.backend=docker";
 
@@ -52,17 +55,21 @@ export const DockerWorkspaceRegistryServiceLayer = Layer.effect(
       return parseLines(stdout);
     });
 
-    const resolve = Effect.fn("DockerWorkspaceRegistry.resolve")(function* (project) {
-      return dockerWorkspaceHandle(project);
-    });
+    const resolve = Effect.fn("DockerWorkspaceRegistry.resolve")((project) =>
+      Effect.succeed(dockerWorkspaceHandle(project)),
+    );
 
     const listMainProjects = Effect.fn("DockerWorkspaceRegistry.listMainProjects")(function* () {
       const lines = yield* dockerList(`--filter label=skipper.workspace=main`);
 
-      return [...new Set(lines.flatMap((line) => {
-        const [repository] = line.split("\t");
-        return repository && repository.length > 0 ? [repository] : [];
-      }))];
+      return [
+        ...new Set(
+          lines.flatMap((line) => {
+            const [repository] = line.split("\t");
+            return repository && repository.length > 0 ? [repository] : [];
+          }),
+        ),
+      ];
     });
 
     const listBranchProjects = Effect.fn("DockerWorkspaceRegistry.listBranchProjects")(function* (

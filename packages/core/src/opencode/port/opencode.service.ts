@@ -42,7 +42,10 @@ export interface OpenCodeService {
     workspace: WorkspaceHandle,
     sessionId: string,
   ) => Effect.Effect<ReadonlyArray<OpenCodeTranscriptMessage>, OpenCodeError, never>;
-  abortSession: (workspace: WorkspaceHandle, sessionId: string) => Effect.Effect<void, never, never>;
+  abortSession: (
+    workspace: WorkspaceHandle,
+    sessionId: string,
+  ) => Effect.Effect<void, never, never>;
 }
 
 export const OpenCodeService = ServiceMap.Service<OpenCodeService>("OpenCodeService");

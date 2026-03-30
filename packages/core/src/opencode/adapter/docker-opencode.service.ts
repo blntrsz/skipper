@@ -1,10 +1,7 @@
 import { createOpencodeClient } from "@opencode-ai/sdk";
 import { Effect, Layer, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
-import {
-  OpenCodeError,
-  OpenCodeService,
-} from "../port/opencode.service";
+import { OpenCodeError, OpenCodeService } from "../port/opencode.service";
 import { DOCKER_SANDBOX_PORT } from "../../workspace/adapter/docker-workspace.shared";
 import type { WorkspaceHandle } from "../../workspace/port/workspace-registry.service";
 import {
@@ -16,7 +13,11 @@ import {
   mapOpenCodeError,
 } from "./sdk-opencode.service";
 
-const shellQuote = (value: string) => `'${value.replaceAll("'", `'\"'\"'`)}'`;
+const SERVER_PROBE_INTERVAL_MS = 250;
+const MAX_SERVER_START_ATTEMPTS = 40;
+
+const shellQuote = (value: string) => `'${value.replaceAll("'", `'"'"'`)}'`;
+const openCodeServerCommand = `opencode serve --hostname=0.0.0.0 --port=${DOCKER_SANDBOX_PORT}`;
 
 const ensureContainerName = (workspace: WorkspaceHandle) => {
   if (workspace.containerName) {
@@ -58,13 +59,17 @@ export const DockerOpenCodeServiceLayer = Layer.effect(
       ).pipe(Effect.mapError(mapOpenCodeError)),
     );
 
-    const containerIp = Effect.fn("DockerOpenCode.containerIp")(function* (workspace: WorkspaceHandle) {
+    const containerIp = Effect.fn("DockerOpenCode.containerIp")(function* (
+      workspace: WorkspaceHandle,
+    ) {
       return yield* runCommand(
         `docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${shellQuote(ensureContainerName(workspace))}`,
       );
     });
 
-    const ensureServer = Effect.fn("DockerOpenCode.ensureServer")(function* (workspace: WorkspaceHandle) {
+    const ensureServer = Effect.fn("DockerOpenCode.ensureServer")(function* (
+      workspace: WorkspaceHandle,
+    ) {
       const containerName = ensureContainerName(workspace);
       const baseUrl = `http://${yield* containerIp(workspace)}:${DOCKER_SANDBOX_PORT}`;
 
@@ -80,17 +85,17 @@ export const DockerOpenCodeServiceLayer = Layer.effect(
       }
 
       yield* runCommand(
-        `docker exec ${shellQuote(containerName)} sh -lc 'pgrep -f "opencode serve --hostname=0.0.0.0 --port=${DOCKER_SANDBOX_PORT}" >/dev/null || nohup opencode serve --hostname=0.0.0.0 --port=${DOCKER_SANDBOX_PORT} >/tmp/skipper-opencode.log 2>&1 &'`,
+        `docker exec ${shellQuote(containerName)} sh -lc 'pgrep -f "${openCodeServerCommand}" >/dev/null || nohup ${openCodeServerCommand} >/tmp/skipper-opencode.log 2>&1 &'`,
       );
 
       yield* Effect.tryPromise({
         try: async () => {
-          for (let attempt = 0; attempt < 40; attempt++) {
+          for (let attempt = 0; attempt < MAX_SERVER_START_ATTEMPTS; attempt++) {
             try {
               await fetch(baseUrl);
               return;
             } catch {
-              await Bun.sleep(250);
+              await Bun.sleep(SERVER_PROBE_INTERVAL_MS);
             }
           }
 
@@ -104,17 +109,21 @@ export const DockerOpenCodeServiceLayer = Layer.effect(
 
     const withClient = <A>(
       workspace: WorkspaceHandle,
-      f: (client: ReturnType<typeof createOpencodeClient>) => Effect.Effect<A, OpenCodeError, never>,
+      f: (
+        client: ReturnType<typeof createOpencodeClient>,
+      ) => Effect.Effect<A, OpenCodeError, never>,
     ) =>
-      Effect.scoped(Effect.gen(function* () {
-        const baseUrl = yield* ensureServer(workspace);
-        const client = createOpencodeClient({
-          baseUrl,
-          directory: workspace.cwd,
-        });
+      Effect.scoped(
+        Effect.gen(function* () {
+          const baseUrl = yield* ensureServer(workspace);
+          const client = createOpencodeClient({
+            baseUrl,
+            directory: workspace.cwd,
+          });
 
-        return yield* f(client);
-      }));
+          return yield* f(client);
+        }),
+      );
 
     return OpenCodeService.of({
       createSession: (workspace, title) =>
@@ -129,7 +138,9 @@ export const DockerOpenCodeServiceLayer = Layer.effect(
                     id: result.data.id,
                     title: result.data.title,
                   })
-                : Effect.fail(createOpenCodeError("ExecutionFailed", "OpenCode session not created")),
+                : Effect.fail(
+                    createOpenCodeError("ExecutionFailed", "OpenCode session not created"),
+                  ),
             ),
           ),
         ),
@@ -200,7 +211,10 @@ export const DockerOpenCodeServiceLayer = Layer.effect(
           Effect.tryPromise(() => client.session.abort({ path: { id: sessionId } })).pipe(
             Effect.ignore,
           ),
-        ).pipe(Effect.ignore, Effect.catch(() => Effect.void)),
+        ).pipe(
+          Effect.ignore,
+          Effect.catch(() => Effect.void),
+        ),
     });
   }),
 );

@@ -26,19 +26,19 @@ RUN mkdir -p /etc/apt/keyrings && curl -fsSL https://cli.github.com/packages/git
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get update && apt-get install -y gh nodejs && rm -rf /var/lib/apt/lists/*
 RUN curl -fsSL https://bun.sh/install | bash
 ENV PATH="/root/.bun/bin:\${PATH}"
-RUN npm install -g opencode-ai@latest
+RUN /root/.bun/bin/bun add -g opencode-ai@latest
 WORKDIR /workspace
 CMD ["bash", "-lc", "while sleep 3600; do :; done"]
 `;
 
-const shellQuote = (value: string) => `'${value.replaceAll("'", `'\"'\"'`)}'`;
+const shellQuote = (value: string) => `'${value.replaceAll("'", `'"'"'`)}'`;
 
 const parseDefaultBranch = (output: string) => {
   const symbolicRef = output.trim();
 
   if (symbolicRef.length > 0) {
     const parts = symbolicRef.split("/");
-    return parts[parts.length - 1];
+    return parts.length > 1 ? parts[parts.length - 1] : undefined;
   }
 
   return undefined;
@@ -109,9 +109,7 @@ export const DockerSandboxServiceLayer = Layer.effect(
       return yield* Effect.tryPromise({
         try: () => stat(path),
         catch: () => undefined,
-      }).pipe(
-        Effect.map((value) => value !== undefined),
-      );
+      }).pipe(Effect.map((value) => value !== undefined));
     });
 
     const ensureImage = Effect.fn("DockerSandbox.ensureImage")(function* () {
@@ -131,7 +129,9 @@ export const DockerSandboxServiceLayer = Layer.effect(
       );
     });
 
-    const containerExists = Effect.fn("DockerSandbox.containerExists")(function* (project: ProjectModel) {
+    const containerExists = Effect.fn("DockerSandbox.containerExists")(function* (
+      project: ProjectModel,
+    ) {
       const output = yield* runCommand(
         `docker ps -a --filter name=^/${dockerContainerName(project)}$ --format '{{.Names}}'`,
       );
@@ -139,7 +139,9 @@ export const DockerSandboxServiceLayer = Layer.effect(
       return output.trim() === dockerContainerName(project);
     });
 
-    const createContainer = Effect.fn("DockerSandbox.createContainer")(function* (project: ProjectModel) {
+    const createContainer = Effect.fn("DockerSandbox.createContainer")(function* (
+      project: ProjectModel,
+    ) {
       const containerName = dockerContainerName(project);
       const labels = dockerWorkspaceLabels(project);
       const mountArgs = [
@@ -191,9 +193,9 @@ export const DockerSandboxServiceLayer = Layer.effect(
     const prepareSnapshot = Effect.fn("DockerSandbox.prepareSnapshot")(function* (
       mainProjectPath: string,
     ) {
-      const tempRoot = yield* Effect.tryPromise(() => mkdtemp(join(tmpdir(), "skipper-docker-"))).pipe(
-        Effect.orDie,
-      );
+      const tempRoot = yield* Effect.tryPromise(() =>
+        mkdtemp(join(tmpdir(), "skipper-docker-")),
+      ).pipe(Effect.orDie);
       const snapshotPath = join(tempRoot, "repository");
 
       yield* Effect.tryPromise(() =>
@@ -237,11 +239,9 @@ export const DockerSandboxServiceLayer = Layer.effect(
     });
 
     const init = Effect.fn("DockerSandbox.init")(
-      (input: SandboxInitInput): Effect.Effect<
-        void,
-        SandboxError | PlatformError.PlatformError,
-        Scope.Scope
-      > =>
+      (
+        input: SandboxInitInput,
+      ): Effect.Effect<void, SandboxError | PlatformError.PlatformError, Scope.Scope> =>
         Effect.gen(function* () {
           const { project, mainProjectPath, mainExists } = input;
 

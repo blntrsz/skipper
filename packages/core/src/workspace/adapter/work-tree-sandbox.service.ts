@@ -17,32 +17,32 @@ export const WorkTreeSandboxServiceLayer = Layer.effect(
       command: string,
       options: ChildProcess.CommandOptions = {},
     ) {
-        const handle = yield* spawn(
-          ChildProcess.make({
-            ...options,
-            stdin: options.stdin ?? "pipe",
-            stdout: options.stdout ?? "pipe",
-            stderr: options.stderr ?? "pipe",
-            shell: false,
-          })`sh -lc ${command}`,
-        );
+      const handle = yield* spawn(
+        ChildProcess.make({
+          ...options,
+          stdin: options.stdin ?? "pipe",
+          stdout: options.stdout ?? "pipe",
+          stderr: options.stderr ?? "pipe",
+          shell: false,
+        })`sh -lc ${command}`,
+      );
 
-        let result = "";
-        yield* Stream.runForEach(handle.all, (chunk) => {
-          const stringChunk = chunk.toString();
-          result += stringChunk;
-          return Console.log(stringChunk);
-        });
-
-        const exitCode = yield* handle.exitCode;
-
-        if (exitCode !== 0) {
-          return yield* new SandboxError({
-            reason: "ExecutionFailed",
-            message: `Command failed with exit code ${exitCode}: ${result}`,
-          });
-        }
+      let result = "";
+      yield* Stream.runForEach(handle.all, (chunk) => {
+        const stringChunk = chunk.toString();
+        result += stringChunk;
+        return Console.log(stringChunk);
       });
+
+      const exitCode = yield* handle.exitCode;
+
+      if (exitCode !== 0) {
+        return yield* new SandboxError({
+          reason: "ExecutionFailed",
+          message: `Command failed with exit code ${exitCode}: ${result}`,
+        });
+      }
+    });
 
     const execute = Effect.fn("WorkTreeSandboxService.execute")(function* (
       workspace: WorkspaceHandle,
