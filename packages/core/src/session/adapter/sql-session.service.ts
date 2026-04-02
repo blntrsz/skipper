@@ -1,4 +1,4 @@
-import { Effect, Layer } from "effect";
+import { DateTime, Effect, Layer } from "effect";
 import type { SessionState } from "../domain/session.model";
 import { SessionService } from "../port/session.service";
 import { SessionRepository } from "../port/session.repository";
@@ -69,11 +69,12 @@ export const SqlSessionServiceLayer = Layer.effect(
     const updateState: SessionService["updateState"] = (sessionId, state) =>
       Effect.gen(function* () {
         const session = yield* repository.findById(sessionId);
+        const now = yield* DateTime.now;
 
         return yield* repository.update({
           ...session,
           state,
-          updatedAt: Date.now(),
+          updatedAt: DateTime.toEpochMillis(now),
         });
       });
 

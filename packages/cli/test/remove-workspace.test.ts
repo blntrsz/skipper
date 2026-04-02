@@ -67,6 +67,7 @@ describe("workspace remove", () => {
           project,
           mainProjectPath,
           branchPath,
+          force: false,
         },
       ]);
       expect(calls.detached).toEqual([project]);
@@ -78,6 +79,7 @@ describe("workspace remove", () => {
   it.effect("skips git worktree removal for main repo", () =>
     Effect.gen(function* () {
       const project = new ProjectModel({ name: "skipper" });
+      const mainProjectPath = "/repos/skipper";
 
       const calls = {
         destroyInputs: [] as Array<SandboxDestroyInput>,
@@ -113,14 +115,14 @@ describe("workspace remove", () => {
             destroy: (project) => Effect.sync(() => void calls.destroyed.push(project)),
             rootCwd: () => Effect.die("unused"),
             mainCwd: () => Effect.die("unused"),
-            mainProjectCwd: () => Effect.die("unused"),
+            mainProjectCwd: () => Effect.succeed(mainProjectPath),
             branchCwd: () => Effect.die("unused"),
             branchProjectCwd: () => Effect.die("unused"),
           }),
         ),
       );
 
-      expect(calls.destroyInputs).toEqual([{ project }]);
+      expect(calls.destroyInputs).toEqual([{ project, mainProjectPath }]);
       expect(calls.destroyed).toEqual([]);
       expect(calls.detached).toBe(1);
       expect(calls.sandboxDestroyed).toBe(1);
@@ -182,6 +184,7 @@ describe("workspace remove", () => {
           project,
           mainProjectPath,
           branchPath,
+          force: false,
         },
       ]);
       expect(calls.detached).toEqual([project]);

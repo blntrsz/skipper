@@ -15,11 +15,7 @@ export const attachWorkspaceCommand = Command.make(
         branchMode: config.create ? "new" : "existing",
       });
 
-      if (project.isMain() && !config.create) {
-        yield* Workspace.initWorkspace(project);
-      }
-
-      if (config.create) {
+      if (config.create || project.isMain()) {
         yield* Workspace.initWorkspace(project);
       }
 
